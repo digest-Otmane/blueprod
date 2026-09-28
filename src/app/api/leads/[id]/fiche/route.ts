@@ -9,29 +9,48 @@ export async function POST(
   const user = getUserFromRequest(request);
   if (!user) return unauthorized();
   if (user.role !== "centre_appel" && user.role !== "admin") {
-    return forbidden("Réservé au centre d'appel.");
+    return forbidden("La qualification des leads est réservée au Centre d'Appel et à l'Administration.");
   }
 
   const body = await request.json().catch(() => ({}));
-  const { besoin, budget, dispo, notes, interet, commercial, commercial_id } = body;
+  const { besoin, need_type, budget, dispo, notes, interet, commercial, commercial_id } = body;
+
   if (!commercial) {
-    return NextResponse.json({ error: "Choisissez le commercial destinataire." }, { status: 400 });
+    return NextResponse.json({ error: "Veuillez sélectionner le commercial destinataire." }, { status: 400 });
+  }
+
+  // Déterminer le need_type s'il n'est pas explicite (analyse du texte du besoin)
+  let detectedNeed = need_type;
+  if (!detectedNeed && besoin) {
+    const b = besoin.toLowerCase();
+    if (b.includes("machine") || b.includes("équipement") || b.includes("equipement") || b.includes("moulin")) {
+      detectedNeed = "equipement_cafe";
+    } else if (b.includes("grain") || b.includes("café") || b.includes("cafe") || b.includes("capsule")) {
+      detectedNeed = "achat_cafe";
+    }
   }
 
   const supabase = getSupabaseAdmin();
+  const updateData: Record<string, any> = {
+    fiche_besoin: besoin || "Non précisé",
+    fiche_budget: budget || null,
+    fiche_dispo: dispo || null,
+    fiche_notes: notes || "—",
+    fiche_interet: interet || "tiede",
+    fiche_qualifie_par: user.name,
+    commercial,
+    commercial_id: commercial_id || null,
+    assigned_commercial_id: commercial_id || null,
+    stage: "nouveau", // Qualifié et poussé dans le pipeline du commercial
+  };
+
+  if (detectedNeed) {
+    updateData.need_type = detectedNeed;
+  }
+
   const { error } = await supabase
     .from("leads")
-    .update({
-      fiche_besoin: besoin || "Non précisé",
-      fiche_budget: budget || null,
-      fiche_dispo: dispo || null,
-      fiche_notes: notes || "—",
-      fiche_interet: interet || "tiede",
-      fiche_qualifie_par: user.name,
-      commercial,
-      commercial_id: commercial_id || null,
-      stage: "nouveau",
-    })
+    .update(updateData)
     .eq("id", params.id);
 
   if (error) {

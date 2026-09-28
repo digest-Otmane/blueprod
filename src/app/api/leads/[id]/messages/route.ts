@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getUserFromRequest, unauthorized } from "@/lib/auth";
+import { getUserFromRequest, unauthorized, forbidden } from "@/lib/auth";
 
 export async function GET(
   request: NextRequest,
@@ -10,9 +10,36 @@ export async function GET(
   if (!user) return unauthorized();
 
   const supabase = getSupabaseAdmin();
+
+  // Commercial : vérification de l'affectation du lead
+  if (user.role === "commercial") {
+    const { data: lead, error: leadErr } = await supabase
+      .from("leads")
+      .select("commercial, commercial_id, assigned_commercial_id, brand")
+      .eq("id", params.id)
+      .maybeSingle();
+
+    if (leadErr || !lead) {
+      return NextResponse.json({ error: "Lead introuvable." }, { status: 404 });
+    }
+
+    if (lead.brand !== user.brand) {
+      return forbidden("Accès interdit : Lead d'une autre marque.");
+    }
+
+    const isAssigned =
+      lead.commercial === user.name ||
+      lead.commercial_id === user.id ||
+      lead.assigned_commercial_id === user.id;
+
+    if (!isAssigned) {
+      return forbidden("Accès interdit : Ce lead ne vous est pas assigné.");
+    }
+  }
+
   const { data: rows, error } = await supabase
     .from("lead_messages")
-    .select("id, lead_id, from_side, text, created_at")
+    .select("id, lead_id, from_side, direction, phone, text, status, created_at")
     .eq("lead_id", params.id)
     .order("id", { ascending: true });
 
@@ -25,8 +52,12 @@ export async function GET(
     messages: (rows || []).map((r) => ({
       id: r.id,
       lead_id: r.lead_id,
-      from: r.from_side,
+      from: r.from_side === "eux" || r.direction === "inbound" ? "eux" : "moi",
+      from_side: r.from_side,
+      direction: r.direction || "outbound",
+      phone: r.phone,
       text: r.text,
+      status: r.status || "sent",
       created_at: r.created_at,
     })),
   });
@@ -39,21 +70,51 @@ export async function POST(
   const user = getUserFromRequest(request);
   if (!user) return unauthorized();
 
+  const supabase = getSupabaseAdmin();
+
+  // Vérification des droits sur le lead
+  const { data: lead, error: leadErr } = await supabase
+    .from("leads")
+    .select("commercial, commercial_id, assigned_commercial_id, brand, tel")
+    .eq("id", params.id)
+    .maybeSingle();
+
+  if (leadErr || !lead) {
+    return NextResponse.json({ error: "Lead introuvable." }, { status: 404 });
+  }
+
+  if (user.role === "commercial") {
+    if (lead.brand !== user.brand) {
+      return forbidden("Accès interdit : Lead d'une autre marque.");
+    }
+    const isAssigned =
+      lead.commercial === user.name ||
+      lead.commercial_id === user.id ||
+      lead.assigned_commercial_id === user.id;
+
+    if (!isAssigned) {
+      return forbidden("Accès interdit : Ce lead ne vous est pas assigné.");
+    }
+  }
+
   const body = await request.json().catch(() => ({}));
   const text = String(body.text || "").trim();
   const from_side = body.from_side || "moi";
+  const direction = from_side === "eux" ? "inbound" : "outbound";
 
   if (!text) {
-    return NextResponse.json({ error: "Message vide." }, { status: 400 });
+    return NextResponse.json({ error: "Le contenu du message ne peut pas être vide." }, { status: 400 });
   }
 
-  const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("lead_messages")
     .insert({
       lead_id: params.id,
       from_side,
+      direction,
+      phone: lead.tel || null,
       text,
+      status: "sent",
     })
     .select("id")
     .single();

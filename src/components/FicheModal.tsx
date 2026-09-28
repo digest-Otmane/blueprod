@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Lead, CommercialUser, LeadInterest } from "@/types/crm";
 
 interface FicheModalProps {
@@ -41,14 +41,19 @@ export const FicheModal: React.FC<FicheModalProps> = ({
   const [commercialName, setCommercialName] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Filter sales reps matching lead brand
-  const filteredCommerciaux = commerciaux.filter(
-    (c) => !lead || c.brand === lead.brand
-  );
+  // Filter sales reps matching lead brand strictly
+  const filteredCommerciaux = useMemo(() => {
+    return commerciaux.filter((c) => !lead || c.brand === lead.brand);
+  }, [commerciaux, lead]);
 
   useEffect(() => {
-    if (filteredCommerciaux.length > 0 && !commercialName) {
-      setCommercialName(filteredCommerciaux[0].name);
+    if (filteredCommerciaux.length > 0) {
+      const exists = filteredCommerciaux.some((c) => c.name === commercialName);
+      if (!exists) {
+        setCommercialName(filteredCommerciaux[0].name);
+      }
+    } else {
+      setCommercialName("");
     }
   }, [filteredCommerciaux, commercialName]);
 

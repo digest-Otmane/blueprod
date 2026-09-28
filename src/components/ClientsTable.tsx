@@ -88,7 +88,16 @@ export const ClientsTable: React.FC<ClientsTableProps> = ({
                     {c.ville && <div className="cell-sub">{c.ville}</div>}
                   </td>
                   <td className="cell-sub">{c.secteur || "—"}</td>
-                  <td>{(c.brands || []).map(brandBadge)}</td>
+                  <td>
+                    {(Array.isArray(c.brands)
+                      ? c.brands
+                      : typeof c.brands === "string"
+                      ? c.brands.split(",")
+                      : []
+                    )
+                      .filter(Boolean)
+                      .map(brandBadge)}
+                  </td>
                   <td>
                     {c.contact || "—"}
                     {c.tel && <div className="cell-sub">{c.tel}</div>}

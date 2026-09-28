@@ -3,10 +3,38 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { getUserFromRequest, unauthorized, forbidden } from "@/lib/auth";
 
 const META_LEAD_POOL = [
-  { client: "Café Le Phare", brand: "lv" as const, tel: "+212 6 15 22 40 61", platform: "facebook" as const, note: "Formulaire \"Devis rapide\" — café en grains pour restaurant" },
-  { client: "Salon de Thé Ambre", brand: "lvt" as const, tel: "+212 6 44 90 12 38", platform: "instagram" as const, note: "Pub Instagram — demande d'infos machine espresso" },
-  { client: "Pizzeria Bella Casa", brand: "lv" as const, tel: "+212 6 77 08 55 19", platform: "facebook" as const, note: "Formulaire \"Contact\" — capsules et sirops" },
-  { client: "Rooftop Sky Lounge", brand: "lvt" as const, tel: "+212 6 22 61 40 77", platform: "instagram" as const, note: "Pub Instagram — équipement terrasse + café" },
+  {
+    client: "Café Le Phare",
+    brand: "lv" as const,
+    need_type: "achat_cafe" as const,
+    tel: "+212 6 15 22 40 61",
+    platform: "facebook" as const,
+    note: "Formulaire \"Devis rapide\" — café en grains pour restaurant",
+  },
+  {
+    client: "Salon de Thé Ambre",
+    brand: "lvt" as const,
+    need_type: "equipement_cafe" as const,
+    tel: "+212 6 44 90 12 38",
+    platform: "instagram" as const,
+    note: "Pub Instagram — demande d'infos machine espresso",
+  },
+  {
+    client: "Pizzeria Bella Casa",
+    brand: "lv" as const,
+    need_type: "achat_cafe" as const,
+    tel: "+212 6 77 08 55 19",
+    platform: "facebook" as const,
+    note: "Formulaire \"Contact\" — capsules et sirops",
+  },
+  {
+    client: "Rooftop Sky Lounge",
+    brand: "lvt" as const,
+    need_type: "equipement_cafe" as const,
+    tel: "+212 6 22 61 40 77",
+    platform: "instagram" as const,
+    note: "Pub Instagram — équipement terrasse + café",
+  },
 ];
 
 export async function POST(request: NextRequest) {
@@ -24,12 +52,13 @@ export async function POST(request: NextRequest) {
     id,
     client: tpl.client,
     brand: tpl.brand,
+    need_type: tpl.need_type,
     stage: "a_qualifier",
     commercial: null,
     commercial_id: null,
     valeur: 0,
     tel: tpl.tel,
-    date_label: "à l'instant",
+    date_label: "À l'instant",
     source: tpl.platform,
     meta_note: tpl.note,
   });
@@ -38,6 +67,16 @@ export async function POST(request: NextRequest) {
     console.error("Error creating simulated meta lead:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // Ajouter l'historique initial dans lead_messages
+  await supabase.from("lead_messages").insert({
+    lead_id: id,
+    from_side: "eux",
+    direction: "inbound",
+    phone: tpl.tel,
+    text: `Lead généré automatiquement via campagne Meta (${tpl.platform}). Formulaire publicitaire reçu.`,
+    status: "received",
+  });
 
   return NextResponse.json({ ok: true, id }, { status: 201 });
 }

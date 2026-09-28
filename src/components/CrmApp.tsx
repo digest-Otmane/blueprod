@@ -31,7 +31,7 @@ import { WaModal } from "./WaModal";
 export const CrmApp: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState<PageKey>("dashboard");
-  const [currentBrand, setCurrentBrand] = useState<Brand>("all");
+  const [currentBrand, setCurrentBrand] = useState<Brand>("lv");
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -78,12 +78,14 @@ export const CrmApp: React.FC = () => {
       const brandQ = activeUser.role === "admin" && activeBrand !== "all" ? `?brand=${activeBrand}` : "";
 
       try {
+        const isCentreAppel = activeUser.role === "centre_appel";
+
         const calls: Promise<any>[] = [
           fetchApi("/clients" + brandQ),
           fetchApi("/leads" + brandQ),
-          fetchApi("/commandes" + brandQ),
-          fetchApi("/devis" + brandQ),
-          fetchApi("/factures" + brandQ),
+          !isCentreAppel ? fetchApi("/commandes" + brandQ) : Promise.resolve({ commandes: [] }),
+          !isCentreAppel ? fetchApi("/devis" + brandQ) : Promise.resolve({ devis: [] }),
+          !isCentreAppel ? fetchApi("/factures" + brandQ) : Promise.resolve({ factures: [] }),
           fetchApi("/users/commerciaux"),
         ];
 
@@ -139,7 +141,10 @@ export const CrmApp: React.FC = () => {
       try {
         const data = await fetchApi("/auth/me");
         setUser(data.user);
-        await loadAll(currentBrand, data.user);
+        const initialBrand: Brand =
+          data.user.brand && data.user.brand !== "all" ? data.user.brand : "lv";
+        setCurrentBrand(initialBrand);
+        await loadAll(initialBrand, data.user);
       } catch {
         setUser(null);
       } finally {
@@ -150,9 +155,11 @@ export const CrmApp: React.FC = () => {
 
   const handleLoginSuccess = async (loggedUser: User) => {
     setUser(loggedUser);
-    setCurrentBrand("all");
+    const initialBrand: Brand =
+      loggedUser.brand && loggedUser.brand !== "all" ? loggedUser.brand : "lv";
+    setCurrentBrand(initialBrand);
     setCurrentPage("dashboard");
-    await loadAll("all", loggedUser);
+    await loadAll(initialBrand, loggedUser);
   };
 
   const handleLogout = async () => {
@@ -199,10 +206,17 @@ export const CrmApp: React.FC = () => {
           : l
       )
     );
-    await fetchApi(`/leads/${leadId}/messages`, {
-      method: "POST",
-      body: JSON.stringify({ text, from_side: "moi" }),
-    });
+    try {
+      await fetchApi("/whatsapp/send", {
+        method: "POST",
+        body: JSON.stringify({ lead_id: leadId, text }),
+      });
+    } catch {
+      await fetchApi(`/leads/${leadId}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ text, from_side: "moi" }),
+      });
+    }
   };
 
   const handleSimulateMeta = async () => {
@@ -214,9 +228,11 @@ export const CrmApp: React.FC = () => {
     try {
       const data = await fetchApi(`/auth/impersonate/${userId}`, { method: "POST" });
       setUser(data.user);
-      setCurrentBrand("all");
+      const impersonatedBrand: Brand =
+        data.user.brand && data.user.brand !== "all" ? data.user.brand : "lv";
+      setCurrentBrand(impersonatedBrand);
       setCurrentPage("dashboard");
-      await loadAll("all", data.user);
+      await loadAll(impersonatedBrand, data.user);
     } catch (e: any) {
       alert(e.message || "Impossible d'accéder à cet espace.");
     }
@@ -226,9 +242,9 @@ export const CrmApp: React.FC = () => {
     try {
       const data = await fetchApi("/auth/return-admin", { method: "POST" });
       setUser(data.user);
-      setCurrentBrand("all");
+      setCurrentBrand("lv");
       setCurrentPage("dashboard");
-      await loadAll("all", data.user);
+      await loadAll("lv", data.user);
     } catch (e: any) {
       alert(e.message || "Session administrateur expirée, veuillez vous reconnecter.");
       setUser(null);
@@ -325,9 +341,14 @@ export const CrmApp: React.FC = () => {
   const leadsCount =
     user.role === "centre_appel"
       ? leads.filter((l) => l.stage === "a_qualifier").length
+      : user.role === "commercial"
+      ? leads.filter((l) => l.stage !== "a_qualifier" && l.stage !== "converti" && l.stage !== "perdu").length
       : leads.filter((l) => l.stage !== "converti" && l.stage !== "perdu").length;
 
-  const activeFicheLead = ficheLeadId ? leads.find((l) => l.id === ficheLeadId) || null : null;
+  const activeFicheLead =
+    user.role !== "commercial" && ficheLeadId
+      ? leads.find((l) => l.id === ficheLeadId) || null
+      : null;
   const activeWaLead = waLeadId ? leads.find((l) => l.id === waLeadId) || null : null;
 
   return (
@@ -379,8 +400,13 @@ export const CrmApp: React.FC = () => {
               user={user}
               leads={leads}
               commerciaux={commerciaux}
+              currentBrand={currentBrand}
               onStageChange={handleStageChange}
-              onOpenFiche={(id) => setFicheLeadId(id)}
+              onOpenFiche={(id) => {
+                if (user.role !== "commercial") {
+                  setFicheLeadId(id);
+                }
+              }}
               onOpenWa={(id) => setWaLeadId(id)}
               onEditLead={(id) => handleOpenEdit("lead", id)}
               onDeleteLead={(id) => handleDeleteItem("lead", id)}

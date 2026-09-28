@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
-import { User, Lead, LeadStage, CommercialUser } from "@/types/crm";
+import React, { useState, useRef, useEffect, useMemo } from "react";
+import { User, Lead, LeadStage, CommercialUser, Brand } from "@/types/crm";
 
 interface KanbanBoardProps {
   user: User;
   leads: Lead[];
   commerciaux: CommercialUser[];
+  currentBrand?: Brand;
   onStageChange: (leadId: string, newStage: LeadStage) => Promise<void>;
   onOpenFiche: (leadId: string) => void;
   onOpenWa: (leadId: string) => void;
@@ -35,6 +36,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   user,
   leads,
   commerciaux,
+  currentBrand = "all",
   onStageChange,
   onOpenFiche,
   onOpenWa,
@@ -46,7 +48,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const [commercialFilter, setCommercialFilter] = useState("tous");
-  const [activeStageTab, setActiveStageTab] = useState<string>("tous");
   const [openMenuLeadId, setOpenMenuLeadId] = useState<string | null>(null);
 
   const kanbanContainerRef = useRef<HTMLDivElement>(null);
@@ -54,8 +55,35 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   const isAdmin = user.role === "admin";
   const isCentreAppel = user.role === "centre_appel";
+  const isCommercial = user.role === "commercial";
 
-  // Close dropdown on click outside
+  // Les commerciaux ne voient pas l'étape brute "À qualifier" (réservée au Centre d'Appel / Admin)
+  const visibleStages = useMemo(() => {
+    if (isCommercial) {
+      return STAGES.filter((s) => s.key !== "a_qualifier");
+    }
+    return STAGES;
+  }, [isCommercial]);
+
+  // 1. Filtrage dynamique des commerciaux en fonction de la marque sélectionnée
+  const filteredCommerciaux = useMemo(() => {
+    if (currentBrand && currentBrand !== "all") {
+      return commerciaux.filter((c) => c.brand === currentBrand);
+    }
+    return commerciaux;
+  }, [commerciaux, currentBrand]);
+
+  // Réinitialiser le filtre si le commercial sélectionné ne correspond plus à la marque active
+  useEffect(() => {
+    if (commercialFilter !== "tous") {
+      const exists = filteredCommerciaux.some((c) => c.name === commercialFilter);
+      if (!exists) {
+        setCommercialFilter("tous");
+      }
+    }
+  }, [filteredCommerciaux, commercialFilter]);
+
+  // Fermer le menu dropdown sur clic extérieur
   useEffect(() => {
     const handleDocClick = () => {
       setOpenMenuLeadId(null);
@@ -86,29 +114,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   };
 
   const filteredLeads = leads.filter((l) => {
+    if (isCommercial && l.stage === "a_qualifier") {
+      return false;
+    }
     if (isAdmin && commercialFilter !== "tous") {
       return l.commercial === commercialFilter;
     }
     return true;
   });
-
-  const allStageKeys = ["tous", ...STAGES.map((s) => s.key)];
-
-  const goToPrevStage = () => {
-    const currentIndex = allStageKeys.indexOf(activeStageTab);
-    const newIndex = currentIndex <= 0 ? allStageKeys.length - 1 : currentIndex - 1;
-    setActiveStageTab(allStageKeys[newIndex]);
-  };
-
-  const goToNextStage = () => {
-    const currentIndex = allStageKeys.indexOf(activeStageTab);
-    const newIndex = currentIndex >= allStageKeys.length - 1 ? 0 : currentIndex + 1;
-    setActiveStageTab(allStageKeys[newIndex]);
-  };
-
-  const handleStageTabClick = (stageKey: string) => {
-    setActiveStageTab(stageKey);
-  };
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     setDraggedLeadId(id);
@@ -134,6 +147,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     e.preventDefault();
     setDragOverStage(null);
     if (!draggedLeadId) return;
+    if (isCommercial && targetStage === "a_qualifier") return;
 
     try {
       await onStageChange(draggedLeadId, targetStage);
@@ -144,16 +158,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     }
   };
 
-  const visibleStages =
-    activeStageTab === "tous"
-      ? STAGES
-      : STAGES.filter((s) => s.key === activeStageTab);
-
   return (
     <div className="page active">
-      <div className="toolbar">
-        <p className="sub" style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.85rem" }}>
-          Gérez votre pipeline de conversion ou transférez directement un prospect via le menu à 3 points.
+      {/* Barre d'outils épurée, compacte et minimaliste */}
+      <div className="toolbar" style={{ marginBottom: "16px" }}>
+        <p className="sub" style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.84rem" }}>
+          Pipeline de conversion commercial · {filteredLeads.length} lead{filteredLeads.length > 1 ? "s" : ""}
         </p>
         <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
           {isAdmin && (
@@ -169,10 +179,17 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 color: "var(--text)",
                 fontFamily: "inherit",
                 fontSize: "0.82rem",
+                cursor: "pointer",
               }}
             >
-              <option value="tous">Tous les commerciaux</option>
-              {commerciaux.map((c) => (
+              <option value="tous">
+                {currentBrand === "lv"
+                  ? "Tous les commerciaux (La Varenne)"
+                  : currentBrand === "lvt"
+                  ? "Tous les commerciaux (Touch)"
+                  : "Tous les commerciaux"}
+              </option>
+              {filteredCommerciaux.map((c) => (
                 <option key={c.id} value={c.name}>
                   {c.name}
                 </option>
@@ -187,7 +204,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               style={{ border: "1px solid var(--border)", borderRadius: "9px" }}
               onClick={onSimulateMeta}
             >
-              Simuler un lead Facebook/Instagram
+              Simuler un lead Meta Ads
             </button>
           )}
 
@@ -202,64 +219,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       </div>
 
       <div className="kanban-wrapper">
-        {/* Navigation bar with stage pills & touch arrows for mobile/tablet */}
-        <div className="kanban-nav-bar">
-          <div className="kanban-pills" role="tablist" aria-label="Étapes du pipeline">
-            <button
-              type="button"
-              className={`kanban-pill-btn ${activeStageTab === "tous" ? "active" : ""}`}
-              onClick={() => handleStageTabClick("tous")}
-            >
-              <span>Toutes les étapes</span>
-              <span className="kanban-pill-count">{filteredLeads.length}</span>
-            </button>
-            {STAGES.map((s) => {
-              const count = filteredLeads.filter((l) => l.stage === s.key).length;
-              const isActive = activeStageTab === s.key;
-              return (
-                <button
-                  key={s.key}
-                  type="button"
-                  className={`kanban-pill-btn ${isActive ? "active" : ""}`}
-                  onClick={() => handleStageTabClick(s.key)}
-                >
-                  <span>{s.label}</span>
-                  <span className="kanban-pill-count">{count}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="kanban-nav-arrows">
-            <button
-              type="button"
-              className="kanban-arrow-btn"
-              title="Étape précédente"
-              aria-label="Étape précédente"
-              onClick={goToPrevStage}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="kanban-arrow-btn"
-              title="Étape suivante"
-              aria-label="Étape suivante"
-              onClick={goToNextStage}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <div
-          ref={kanbanContainerRef}
-          className={`kanban ${visibleStages.length === 1 ? "single-stage" : ""}`}
-        >
+        <div ref={kanbanContainerRef} className="kanban">
           {visibleStages.map((s) => {
             const colLeads = filteredLeads.filter((l) => l.stage === s.key);
             const isOver = dragOverStage === s.key;
@@ -281,13 +241,25 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 </div>
 
                 {colLeads.length === 0 && (
-                  <div style={{ color: "var(--text-muted)", fontSize: "0.78rem", padding: "16px 8px", textAlign: "center", fontStyle: "italic" }}>
+                  <div
+                    style={{
+                      color: "var(--text-muted)",
+                      fontSize: "0.78rem",
+                      padding: "24px 8px",
+                      textAlign: "center",
+                      fontStyle: "italic",
+                      opacity: 0.7,
+                    }}
+                  >
                     Aucun lead dans cette étape
                   </div>
                 )}
 
                 {colLeads.map((l) => {
-                  const lastMsg = l.messages && l.messages.length > 0 ? l.messages[l.messages.length - 1] : null;
+                  const lastMsg =
+                    l.messages && l.messages.length > 0
+                      ? l.messages[l.messages.length - 1]
+                      : null;
                   const isDragging = draggedLeadId === l.id;
                   const isMenuOpen = openMenuLeadId === l.id;
 
@@ -321,7 +293,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             </span>
                           )}
 
-                          {/* 3-dot dropdown menu for stage transfer */}
+                          {/* Menu 3 points pour transfert d'étape */}
                           <div className="kcard-menu-wrap">
                             <button
                               type="button"
@@ -346,7 +318,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <div className="kcard-dropdown-head">Déplacer vers :</div>
-                                {STAGES.map((target) => (
+                                {visibleStages.map((target) => (
                                   <button
                                     key={target.key}
                                     type="button"
@@ -358,7 +330,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                         try {
                                           await onStageChange(l.id, target.key);
                                         } catch (err: any) {
-                                          alert(err.message || "Erreur lors du déplacement du lead.");
+                                          alert(
+                                            err.message ||
+                                              "Erreur lors du déplacement du lead."
+                                          );
                                         }
                                       }
                                     }}
@@ -390,7 +365,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
                       {l.fiche && l.fiche.interet && (
                         <div className="cell-sub" style={{ marginTop: "6px" }}>
-                          📋 {INTERET_NIVEAU[l.fiche.interet]?.label || l.fiche.interet} · {l.fiche.budget || ""}
+                          📋 {INTERET_NIVEAU[l.fiche.interet]?.label || l.fiche.interet} ·{" "}
+                          {l.fiche.budget || ""}
                         </div>
                       )}
 
@@ -400,7 +376,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                         </div>
                       )}
 
-                      {s.key === "a_qualifier" && (
+                      {/* RÈGLE STRICTE : "Qualifier l'appel" uniquement pour Admin et Centre d'Appel (JAMAIS pour les Commerciaux) */}
+                      {!isCommercial && (isAdmin || isCentreAppel) && s.key === "a_qualifier" && (
                         <button
                           type="button"
                           className="kcard-btn-qualify"
@@ -409,7 +386,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             onOpenFiche(l.id);
                           }}
                         >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14, flexShrink: 0 }}>
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            style={{ width: 14, height: 14, flexShrink: 0 }}
+                          >
                             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                           </svg>
                           Qualifier l&apos;appel
@@ -417,7 +400,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       )}
 
                       {isAdmin && (
-                        <div className="row-actions" style={{ marginTop: "9px", justifyContent: "flex-start" }}>
+                        <div
+                          className="row-actions"
+                          style={{ marginTop: "9px", justifyContent: "flex-start" }}
+                        >
                           <button
                             type="button"
                             className="icon-btn"

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { User, CommercialUser, Client } from "@/types/crm";
 
 interface CreateModalProps {
@@ -20,13 +20,38 @@ export const CreateModal: React.FC<CreateModalProps> = ({
   onClose,
   onCreate,
 }) => {
-  const [formData, setFormData] = useState<Record<string, any>>({
+  const initialFormData: Record<string, any> = {
     brand: user.brand !== "all" ? user.brand : "lv",
     commercial: user.role === "commercial" ? user.name : "",
     stage: user.role === "centre_appel" ? "a_qualifier" : "nouveau",
     statut: type === "commande" ? "en_attente" : type === "devis" ? "brouillon" : "emise",
-  });
+  };
+
+  const [formData, setFormData] = useState<Record<string, any>>(initialFormData);
   const [loading, setLoading] = useState(false);
+
+  // Marque active sélectionnée dans le formulaire
+  const activeBrand =
+    type === "client"
+      ? (formData.brands === "lvt" ? "lvt" : formData.brands === "lv" ? "lv" : null)
+      : (formData.brand || (user.brand !== "all" ? user.brand : null));
+
+  const filteredCommerciaux = useMemo(() => {
+    if (activeBrand && activeBrand !== "all") {
+      return commerciaux.filter((c) => c.brand === activeBrand);
+    }
+    return commerciaux;
+  }, [commerciaux, activeBrand]);
+
+  // Réinitialiser le commercial si non compatible avec la nouvelle marque choisie
+  useEffect(() => {
+    if (formData.commercial && filteredCommerciaux.length > 0) {
+      const exists = filteredCommerciaux.some((c) => c.name === formData.commercial);
+      if (!exists && user.role === "admin") {
+        setFormData((prev) => ({ ...prev, commercial: "" }));
+      }
+    }
+  }, [filteredCommerciaux, formData.commercial, user.role]);
 
   if (!type) return null;
 
@@ -162,6 +187,17 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                   <option value="lv,lvt">Les deux marques (LV &amp; Touch)</option>
                 </select>
               </div>
+              <div className="edit-field">
+                <label>Type de besoin principal</label>
+                <select
+                  value={formData.need_type || "achat_cafe"}
+                  onChange={(e) => handleChange("need_type", e.target.value)}
+                >
+                  <option value="achat_cafe">Achat de café (Grains, moulu, capsules)</option>
+                  <option value="equipement_cafe">Équipement café (Machines espresso, moulins)</option>
+                  <option value="mixte">Mixte (Café + Équipement)</option>
+                </select>
+              </div>
               {user.role === "admin" && (
                 <div className="edit-field">
                   <label>Commercial assigné</label>
@@ -170,7 +206,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                     onChange={(e) => handleChange("commercial", e.target.value)}
                   >
                     <option value="">Non assigné</option>
-                    {commerciaux.map((c) => (
+                    {filteredCommerciaux.map((c) => (
                       <option key={c.id} value={c.name}>
                         {c.name}
                       </option>
@@ -231,13 +267,24 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                     onChange={(e) => handleChange("commercial", e.target.value)}
                   >
                     <option value="">Non assigné</option>
-                    {commerciaux.map((c) => (
+                    {filteredCommerciaux.map((c) => (
                       <option key={c.id} value={c.name}>
                         {c.name}
                       </option>
                     ))}
                   </select>
                 </div>
+              </div>
+              <div className="edit-field">
+                <label>Besoin du prospect</label>
+                <select
+                  value={formData.need_type || "achat_cafe"}
+                  onChange={(e) => handleChange("need_type", e.target.value)}
+                >
+                  <option value="achat_cafe">Achat de café (Grains, moulu, capsules)</option>
+                  <option value="equipement_cafe">Équipement café (Machine, moulin)</option>
+                  <option value="mixte">Mixte (Café + Machine)</option>
+                </select>
               </div>
             </>
           )}
@@ -253,6 +300,29 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                   onChange={(e) => handleChange("client", e.target.value)}
                   required
                 />
+              </div>
+              <div className="edit-row2">
+                <div className="edit-field">
+                  <label>Type de commande</label>
+                  <select
+                    value={formData.need_type || "achat_cafe"}
+                    onChange={(e) => handleChange("need_type", e.target.value)}
+                  >
+                    <option value="achat_cafe">Achat de café (Consommables)</option>
+                    <option value="equipement_cafe">Équipement café (Matériel)</option>
+                    <option value="mixte">Commande mixte</option>
+                  </select>
+                </div>
+                <div className="edit-field">
+                  <label>Marque</label>
+                  <select
+                    value={formData.brand || (user.brand !== "all" ? user.brand : "lv")}
+                    onChange={(e) => handleChange("brand", e.target.value)}
+                  >
+                    <option value="lv">La Varenne</option>
+                    <option value="lvt">La Varenne Touch</option>
+                  </select>
+                </div>
               </div>
               <div className="edit-field">
                 <label>Produits commandés</label>
@@ -319,7 +389,7 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                   >
                     <option value="brouillon">Brouillon</option>
                     <option value="envoye">Envoyé</option>
-                    <option value="accepte">Accepté</option>
+                    <option value="accepte">Accepté (Génère la facture)</option>
                     <option value="refuse">Refusé</option>
                   </select>
                 </div>

@@ -18,8 +18,12 @@ export async function GET(request: NextRequest) {
     query = query.eq("brand", brand);
   }
 
+  // Commercial : uniquement ses leads attribués dans sa marque et pré-qualifiés (hors 'a_qualifier')
   if (user.role === "commercial") {
-    query = query.or(`commercial.eq.${user.name},commercial_id.eq.${user.id}`);
+    query = query.or(
+      `commercial.eq.${user.name},commercial_id.eq.${user.id},assigned_commercial_id.eq.${user.id}`
+    );
+    query = query.neq("stage", "a_qualifier");
   }
 
   query = query.order("created_at", { ascending: false });
@@ -65,14 +69,23 @@ export async function POST(request: NextRequest) {
   const client = String(body.client || "").trim();
   const brand = body.brand || (user.brand !== "all" ? user.brand : "lv");
   const stage = body.stage || (user.role === "centre_appel" ? "a_qualifier" : "nouveau");
-  const commercial = user.role === "commercial" ? user.name : body.commercial || null;
-  const commercial_id = user.role === "commercial" ? user.id : body.commercial_id || null;
   const valeur = Number(body.valeur) || 0;
   const tel = body.tel || null;
+  const email = body.email || null;
+  const need_type = body.need_type || "achat_cafe";
   const client_id = body.client_id || null;
   const date_label = body.date_label || "Aujourd'hui";
   const source = body.source || "manuel";
   const meta_note = body.meta_note || null;
+  const meta_lead_id = body.meta_lead_id || null;
+
+  let commercial = body.commercial || null;
+  let commercial_id = body.commercial_id || null;
+
+  if (user.role === "commercial") {
+    commercial = user.name;
+    commercial_id = user.id;
+  }
 
   if (!client) {
     return NextResponse.json({ error: "Le nom du prospect est obligatoire." }, { status: 400 });
@@ -88,11 +101,15 @@ export async function POST(request: NextRequest) {
     stage,
     commercial,
     commercial_id,
+    assigned_commercial_id: commercial_id,
     valeur,
     tel,
+    email,
+    need_type,
     date_label,
     source,
     meta_note,
+    meta_lead_id,
   });
 
   if (error) {

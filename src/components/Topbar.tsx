@@ -105,13 +105,6 @@ export const Topbar: React.FC<TopbarProps> = ({
             <div className="segmented">
               <button
                 type="button"
-                className={currentBrand === "all" ? "active" : ""}
-                onClick={() => onBrandChange("all")}
-              >
-                Toutes marques
-              </button>
-              <button
-                type="button"
                 className={currentBrand === "lv" ? "active" : ""}
                 onClick={() => onBrandChange("lv")}
               >

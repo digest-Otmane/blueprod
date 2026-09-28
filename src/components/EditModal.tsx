@@ -19,11 +19,35 @@ export const EditModal: React.FC<EditModalProps> = ({
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
 
+  // Marque active de l'élément en cours de modification
+  const activeBrand =
+    formData.brand ||
+    (formData.brands === "lvt" ? "lvt" : formData.brands === "lv" ? "lv" : null) ||
+    target?.item?.brand ||
+    null;
+
+  const filteredCommerciaux = React.useMemo(() => {
+    if (activeBrand && activeBrand !== "all") {
+      return commerciaux.filter((c) => c.brand === activeBrand);
+    }
+    return commerciaux;
+  }, [commerciaux, activeBrand]);
+
   useEffect(() => {
     if (target?.item) {
       setFormData({ ...target.item });
     }
   }, [target]);
+
+  // Réinitialiser le commercial si la marque change et qu'il n'appartient plus à cette marque
+  useEffect(() => {
+    if (formData.commercial && filteredCommerciaux.length > 0) {
+      const exists = filteredCommerciaux.some((c) => c.name === formData.commercial);
+      if (!exists && target?.type !== "lead") {
+        setFormData((prev) => ({ ...prev, commercial: "" }));
+      }
+    }
+  }, [filteredCommerciaux, formData.commercial, target?.type]);
 
   if (!target || !target.item) return null;
 
@@ -149,13 +173,24 @@ export const EditModal: React.FC<EditModalProps> = ({
                 </div>
               </div>
               <div className="edit-field">
+                <label>Type de besoin principal</label>
+                <select
+                  value={formData.need_type || "achat_cafe"}
+                  onChange={(e) => handleChange("need_type", e.target.value)}
+                >
+                  <option value="achat_cafe">Achat de café (Grains, moulu, capsules)</option>
+                  <option value="equipement_cafe">Équipement café (Machines, moulins)</option>
+                  <option value="mixte">Mixte (Café + Équipement)</option>
+                </select>
+              </div>
+              <div className="edit-field">
                 <label>Commercial assigné</label>
                 <select
                   value={formData.commercial || ""}
                   onChange={(e) => handleChange("commercial", e.target.value)}
                 >
                   <option value="">Non assigné</option>
-                  {commerciaux.map((c) => (
+                  {filteredCommerciaux.map((c) => (
                     <option key={c.id} value={c.name}>
                       {c.name}
                     </option>
@@ -218,13 +253,24 @@ export const EditModal: React.FC<EditModalProps> = ({
                     onChange={(e) => handleChange("commercial", e.target.value)}
                   >
                     <option value="">Non assigné</option>
-                    {commerciaux.map((c) => (
+                    {filteredCommerciaux.map((c) => (
                       <option key={c.id} value={c.name}>
                         {c.name}
                       </option>
                     ))}
                   </select>
                 </div>
+              </div>
+              <div className="edit-field">
+                <label>Besoin du prospect</label>
+                <select
+                  value={formData.need_type || "achat_cafe"}
+                  onChange={(e) => handleChange("need_type", e.target.value)}
+                >
+                  <option value="achat_cafe">Achat de café (Grains, moulu, capsules)</option>
+                  <option value="equipement_cafe">Équipement café (Machine, moulin)</option>
+                  <option value="mixte">Mixte (Café + Machine)</option>
+                </select>
               </div>
             </>
           )}
@@ -239,6 +285,29 @@ export const EditModal: React.FC<EditModalProps> = ({
                   onChange={(e) => handleChange("client", e.target.value)}
                   required
                 />
+              </div>
+              <div className="edit-row2">
+                <div className="edit-field">
+                  <label>Type de commande</label>
+                  <select
+                    value={formData.need_type || "achat_cafe"}
+                    onChange={(e) => handleChange("need_type", e.target.value)}
+                  >
+                    <option value="achat_cafe">Achat de café (Consommables)</option>
+                    <option value="equipement_cafe">Équipement café (Matériel)</option>
+                    <option value="mixte">Commande mixte</option>
+                  </select>
+                </div>
+                <div className="edit-field">
+                  <label>Marque</label>
+                  <select
+                    value={formData.brand || "lv"}
+                    onChange={(e) => handleChange("brand", e.target.value)}
+                  >
+                    <option value="lv">La Varenne</option>
+                    <option value="lvt">La Varenne Touch</option>
+                  </select>
+                </div>
               </div>
               <div className="edit-field">
                 <label>Produits commandés</label>
@@ -274,42 +343,103 @@ export const EditModal: React.FC<EditModalProps> = ({
             </>
           )}
 
-          {type === "devis" && (
-            <>
-              <div className="edit-field">
-                <label>Client</label>
-                <input
-                  type="text"
-                  value={formData.client || ""}
-                  onChange={(e) => handleChange("client", e.target.value)}
-                  required
-                />
-              </div>
-              <div className="edit-row2">
+          {type === "devis" && (() => {
+            const currentStatut = target.item.statut || "brouillon";
+            const isBrouillon = currentStatut === "brouillon";
+            const isAccepte = currentStatut === "accepte";
+            const isRefuse = currentStatut === "refuse";
+
+            return (
+              <>
+                {!isBrouillon && !isAccepte && (
+                  <div
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      background: "rgba(245, 158, 11, 0.12)",
+                      border: "1px solid rgba(245, 158, 11, 0.3)",
+                      color: "var(--warning)",
+                      fontSize: "0.82rem",
+                      marginBottom: 12,
+                    }}
+                  >
+                    ⚠️ Ce devis est au statut &laquo; {currentStatut} &raquo;. Seuls les devis en brouillon permettent de modifier les montants et le client.
+                  </div>
+                )}
+                {isAccepte && (
+                  <div
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      background: "rgba(16, 185, 129, 0.12)",
+                      border: "1px solid rgba(16, 185, 129, 0.3)",
+                      color: "var(--success)",
+                      fontSize: "0.82rem",
+                      marginBottom: 12,
+                    }}
+                  >
+                    ✓ Devis accepté et verrouillé. La facture correspondante a été générée automatiquement.
+                  </div>
+                )}
                 <div className="edit-field">
-                  <label>Montant (DH)</label>
+                  <label>Client {!isBrouillon && "(Verrouillé)"}</label>
                   <input
-                    type="number"
-                    value={formData.montant ?? 0}
-                    onChange={(e) => handleChange("montant", Number(e.target.value) || 0)}
+                    type="text"
+                    value={formData.client || ""}
+                    onChange={(e) => handleChange("client", e.target.value)}
+                    disabled={!isBrouillon}
                     required
                   />
                 </div>
-                <div className="edit-field">
-                  <label>Statut</label>
-                  <select
-                    value={formData.statut || "brouillon"}
-                    onChange={(e) => handleChange("statut", e.target.value)}
-                  >
-                    <option value="brouillon">Brouillon</option>
-                    <option value="envoye">Envoyé</option>
-                    <option value="accepte">Accepté</option>
-                    <option value="refuse">Refusé</option>
-                  </select>
+                <div className="edit-row2">
+                  <div className="edit-field">
+                    <label>Montant (DH) {!isBrouillon && "(Verrouillé)"}</label>
+                    <input
+                      type="number"
+                      value={formData.montant ?? 0}
+                      onChange={(e) => handleChange("montant", Number(e.target.value) || 0)}
+                      disabled={!isBrouillon}
+                      required
+                    />
+                  </div>
+                  <div className="edit-field">
+                    <label>Statut</label>
+                    <select
+                      value={formData.statut || currentStatut}
+                      onChange={(e) => handleChange("statut", e.target.value)}
+                      disabled={isAccepte}
+                    >
+                      {isBrouillon && (
+                        <>
+                          <option value="brouillon">Brouillon</option>
+                          <option value="envoye">Envoyé</option>
+                          <option value="accepte">Accepté (Génère la facture)</option>
+                          <option value="refuse">Refusé</option>
+                        </>
+                      )}
+                      {currentStatut === "envoye" && (
+                        <>
+                          <option value="envoye">Envoyé</option>
+                          <option value="accepte">Accepté (Génère la facture)</option>
+                          <option value="refuse">Refusé</option>
+                          <option value="brouillon">Revenir en brouillon</option>
+                        </>
+                      )}
+                      {isAccepte && (
+                        <option value="accepte">Accepté (Facture générée)</option>
+                      )}
+                      {isRefuse && (
+                        <>
+                          <option value="refuse">Refusé</option>
+                          <option value="brouillon">Réactiver en brouillon</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
+              </>
+            );
+          })()}
 
           {type === "facture" && (
             <>
@@ -357,6 +487,35 @@ export const EditModal: React.FC<EditModalProps> = ({
         </div>
 
         <div className="fiche-modal-foot">
+          {(type === "devis" || type === "facture") && (
+            <button
+              type="button"
+              className="btn-ghost"
+              style={{
+                marginRight: "auto",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                color: "var(--accent-strong, var(--accent))",
+              }}
+              onClick={() =>
+                window.open(
+                  `/api/${type === "devis" ? "devis" : "factures"}/${id}/pdf`,
+                  "_blank"
+                )
+              }
+              title="Télécharger le document PDF"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
+              Télécharger PDF
+            </button>
+          )}
           <button type="button" className="btn-ghost" onClick={onClose} disabled={loading}>
             Annuler
           </button>

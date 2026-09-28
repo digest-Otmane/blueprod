@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabaseAdmin();
   let query = supabase.from("clients").select("*").order("nom");
 
+  // Règle RBAC : Commercial strictement restreint à son portefeuille
   if (user.role === "commercial") {
     query = query.or(`commercial.eq.${user.name},commercial_id.eq.${user.id}`);
   }
@@ -21,6 +22,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const brand = searchParams.get("brand");
+
   const filtered = (rows || []).filter((c) => {
     const brands = (c.brands || "").split(",");
     if (user.role === "commercial") return brands.includes(user.brand);
@@ -43,11 +45,24 @@ export async function POST(request: NextRequest) {
   const nom = String(body.nom || "").trim();
   const ville = body.ville || null;
   const secteur = body.secteur || null;
-  const brands = Array.isArray(body.brands) ? body.brands.join(",") : body.brands || (user.brand !== "all" ? user.brand : "lv,lvt");
   const contact = body.contact || null;
   const tel = body.tel || null;
-  const commercial = user.role === "commercial" ? user.name : body.commercial || null;
-  const commercial_id = user.role === "commercial" ? user.id : body.commercial_id || null;
+  const email = body.email || null;
+  const lead_id = body.lead_id || null;
+  const need_type = body.need_type || "achat_cafe";
+  const notes = body.notes || null;
+
+  let brands = Array.isArray(body.brands) ? body.brands.join(",") : body.brands;
+  let commercial = body.commercial || null;
+  let commercial_id = body.commercial_id || null;
+
+  if (user.role === "commercial") {
+    commercial = user.name;
+    commercial_id = user.id;
+    brands = user.brand !== "all" ? user.brand : "lv";
+  } else {
+    brands = brands || (user.brand !== "all" ? user.brand : "lv,lvt");
+  }
 
   if (!nom) {
     return NextResponse.json({ error: "Le nom du client est obligatoire." }, { status: 400 });
@@ -62,13 +77,22 @@ export async function POST(request: NextRequest) {
     brands,
     contact,
     tel,
+    email,
     commercial,
     commercial_id,
+    lead_id,
+    need_type,
+    notes,
   });
 
   if (error) {
     console.error("Error creating client:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Si ce client est créé à partir d'un lead, mettre à jour le lead en converti
+  if (lead_id) {
+    await supabase.from("leads").update({ client_id: id, stage: "converti" }).eq("id", lead_id);
   }
 
   return NextResponse.json({ ok: true, id }, { status: 201 });

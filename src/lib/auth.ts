@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import { NextRequest, NextResponse } from "next/server";
-import { User } from "../types/crm";
+import { User, UserRole } from "../types/crm";
 
 export const COOKIE_NAME = "crm_token";
 export const ADMIN_RETURN_COOKIE = "crm_admin_token";
@@ -25,6 +25,7 @@ export function signToken(user: User): string {
     brand: user.brand,
     initials: user.initials,
   };
+  if (user.assigned_commercial_id) payload.assigned_commercial_id = user.assigned_commercial_id;
   if (user.impersonatedBy) payload.impersonatedBy = user.impersonatedBy;
   return jwt.sign(payload, getSecretKey(), { expiresIn: "12h" });
 }
@@ -74,4 +75,28 @@ export function clientIp(request: NextRequest): string {
   const fwd = request.headers.get("x-forwarded-for");
   if (fwd) return fwd.split(",")[0].trim();
   return request.headers.get("x-real-ip") || "unknown";
+}
+
+export function requireUser(
+  request: NextRequest
+): { user: User; errorResponse?: never } | { user?: never; errorResponse: NextResponse } {
+  const user = getUserFromRequest(request);
+  if (!user) {
+    return { errorResponse: unauthorized() };
+  }
+  return { user };
+}
+
+export function requireRole(
+  request: NextRequest,
+  allowedRoles: UserRole[]
+): { user: User; errorResponse?: never } | { user?: never; errorResponse: NextResponse } {
+  const user = getUserFromRequest(request);
+  if (!user) {
+    return { errorResponse: unauthorized() };
+  }
+  if (!allowedRoles.includes(user.role)) {
+    return { errorResponse: forbidden("Permissions insuffisantes pour cette opération.") };
+  }
+  return { user };
 }

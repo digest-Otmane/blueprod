@@ -26,6 +26,7 @@ const STAGE_COLOR: Record<LeadStage, string> = {
   nouveau: "var(--text-muted)",
   contacte: "var(--gold)",
   qualifie: "var(--accent)",
+  attribue: "var(--accent-touch)",
   converti: "var(--success)",
   perdu: "var(--danger)",
 };
@@ -175,8 +176,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }
 
   // Admin and Commercial Dashboard
+  const isCommercial = user.role === "commercial";
   const activeLeads = leads.filter(
-    (l) => l.stage !== "converti" && l.stage !== "perdu"
+    (l) => (isCommercial ? l.stage !== "a_qualifier" : true) && l.stage !== "converti" && l.stage !== "perdu"
   ).length;
   const enAttente = commandes.filter((c) => c.statut === "en_attente").length;
   const convertis = leads.filter((l) => l.stage === "converti").length;
@@ -191,7 +193,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
     0
   );
 
-  const stageCounts = STAGES.map((s) => ({
+  const visibleDashboardStages = isCommercial
+    ? STAGES.filter((s) => s.key !== "a_qualifier")
+    : STAGES;
+
+  const stageCounts = visibleDashboardStages.map((s) => ({
     ...s,
     n: leads.filter((l) => l.stage === s.key).length,
   }));
