@@ -46,12 +46,10 @@ export async function POST(
   const factureId = `FAC-${Date.now().toString(36).toUpperCase()}`;
 
   // 5. Insérer la facture
-  const { error: insertErr } = await supabase.from("factures").insert({
+  const facturePayload = {
     id: factureId,
     client: devis.client,
     client_id: devis.client_id || null,
-    devis_id: devis.id,
-    commande_id: devis.commande_id || null,
     brand: devis.brand,
     montant: devis.montant,
     statut: "emise",
@@ -59,8 +57,9 @@ export async function POST(
     commercial_id: devis.commercial_id,
     date_label: "Aujourd'hui",
     echeance: dateStr,
-    due_date: dueDate.toISOString(),
-  });
+  };
+
+  const { error: insertErr } = await supabase.from("factures").insert(facturePayload);
 
   if (insertErr) {
     console.error("Error creating facture from devis:", insertErr);
@@ -76,11 +75,10 @@ export async function POST(
   if (devisItems && devisItems.length > 0) {
     const factureItems = devisItems.map((item: any) => ({
       facture_id: factureId,
-      product_type: item.product_type,
-      product_name: item.product_name,
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-      total_amount: item.total_amount,
+      product_name: item.product_name || "Produit standard",
+      quantity: Number(item.quantity) || 1,
+      unit_price: Number(item.unit_price) || 0,
+      total_amount: Number(item.total_amount) || (Number(item.quantity) || 1) * (Number(item.unit_price) || 0),
     }));
     await supabase.from("facture_items").insert(factureItems);
   }

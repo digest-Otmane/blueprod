@@ -53,6 +53,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [activeDemo, setActiveDemo] = useState<string | null>(null);
 
+  const [showPassword, setShowPassword] = useState(false);
+
   const performLogin = async (loginEmail: string, loginPass: string) => {
     setError("");
     setLoading(true);
@@ -93,12 +95,31 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   return (
     <div className="login-screen">
       <div className="login-card">
-        <div className="login-logo">
-          <span className="mark">LV</span>
-          <span className="name">La Varenne CRM</span>
+        <div
+          className="login-logo"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: "18px",
+            padding: "4px 0",
+          }}
+        >
+          <img
+            src="/images/LA VARENNE LOGO VR white.png"
+            alt="La Varenne"
+            style={{
+              maxHeight: "58px",
+              maxWidth: "220px",
+              width: "auto",
+              height: "auto",
+              objectFit: "contain",
+              display: "block",
+            }}
+          />
         </div>
-        <p className="login-sub">
-          Accès interne Alea Food — connectez-vous avec l&apos;email et le mot de passe de votre compte.
+        <p className="login-sub" style={{ textAlign: "center", marginBottom: "22px" }}>
+          Accès interne — connectez-vous avec vos identifiants pour continuer.
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -117,14 +138,48 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
           <div className="login-field">
             <label htmlFor="login-password">Mot de passe</label>
-            <input
-              type="password"
-              id="login-password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                id="login-password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                style={{ width: "100%", paddingRight: "42px" }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: "absolute",
+                  right: "10px",
+                  background: "transparent",
+                  border: "none",
+                  padding: "4px",
+                  cursor: "pointer",
+                  color: showPassword ? "var(--gold)" : "var(--text-muted)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "color .15s ease",
+                }}
+                title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+              >
+                {showPassword ? (
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
 
           {error && <p className="login-error">{error}</p>}

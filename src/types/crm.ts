@@ -10,6 +10,8 @@ export interface User {
   role: UserRole;
   brand: Brand;
   initials: string;
+  password?: string;
+  password_hash?: string;
   assigned_commercial_id?: string | null;
   impersonatedBy?: string;
 }

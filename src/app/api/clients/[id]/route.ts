@@ -59,7 +59,7 @@ export async function PUT(
   }
 
   const body = await request.json().catch(() => ({}));
-  const fields = ["nom", "ville", "secteur", "brands", "contact", "tel", "email", "commercial", "commercial_id", "need_type", "notes"];
+  const fields = ["nom", "ville", "secteur", "brands", "contact", "tel", "commercial", "commercial_id", "need_type"];
   const updates: Record<string, any> = {};
 
   for (const f of fields) {

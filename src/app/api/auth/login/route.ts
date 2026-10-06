@@ -90,9 +90,19 @@ export async function POST(request: NextRequest) {
     console.log("  - Rôle :", userRecord.role);
     console.log("  - Hash présent (longueur) :", passwordHash.length);
 
-    // 4. Comparaison du mot de passe avec bcrypt
-    const ok = await bcrypt.compare(password, passwordHash);
-    console.log("[LOGIN DEBUG] 🔑 Résultat bcrypt.compare :", ok ? "SUCCÈS (Mot de passe valide)" : "ÉCHEC (Mot de passe incorrect)");
+    // 4. Comparaison du mot de passe (support direct plain text ou hachage bcrypt)
+    let ok = false;
+    if (password === passwordHash) {
+      ok = true;
+    } else if (
+      passwordHash.startsWith("$2a$") ||
+      passwordHash.startsWith("$2b$") ||
+      passwordHash.startsWith("$2y$")
+    ) {
+      ok = await bcrypt.compare(password, passwordHash);
+    }
+
+    console.log("[LOGIN DEBUG] 🔑 Résultat vérification mot de passe :", ok ? "SUCCÈS (Mot de passe valide)" : "ÉCHEC (Mot de passe incorrect)");
 
     if (!ok) {
       console.log("[LOGIN DEBUG] ❌ Mot de passe erroné pour :", email);

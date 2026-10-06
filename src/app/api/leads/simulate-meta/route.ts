@@ -69,12 +69,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Ajouter l'historique initial dans lead_messages
+  const initialText = `Lead généré automatiquement via campagne Meta (${tpl.platform}). Formulaire publicitaire reçu.`;
   await supabase.from("lead_messages").insert({
     lead_id: id,
     from_side: "eux",
     direction: "inbound",
     phone: tpl.tel,
-    text: `Lead généré automatiquement via campagne Meta (${tpl.platform}). Formulaire publicitaire reçu.`,
+    text: initialText,
+    message: initialText,
     status: "received",
   });
 

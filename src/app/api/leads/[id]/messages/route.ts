@@ -39,7 +39,7 @@ export async function GET(
 
   const { data: rows, error } = await supabase
     .from("lead_messages")
-    .select("id, lead_id, from_side, direction, phone, text, status, created_at")
+    .select("id, lead_id, from_side, direction, phone, text, message, status, created_at")
     .eq("lead_id", params.id)
     .order("id", { ascending: true });
 
@@ -53,10 +53,10 @@ export async function GET(
       id: r.id,
       lead_id: r.lead_id,
       from: r.from_side === "eux" || r.direction === "inbound" ? "eux" : "moi",
-      from_side: r.from_side,
-      direction: r.direction || "outbound",
+      from_side: r.from_side || "moi",
+      direction: r.direction || (r.from_side === "eux" ? "inbound" : "outbound"),
       phone: r.phone,
-      text: r.text,
+      text: r.text || r.message || "",
       status: r.status || "sent",
       created_at: r.created_at,
     })),
@@ -99,7 +99,7 @@ export async function POST(
 
   const body = await request.json().catch(() => ({}));
   const text = String(body.text || "").trim();
-  const from_side = body.from_side || "moi";
+  const from_side = body.from_side === "eux" ? "eux" : "moi";
   const direction = from_side === "eux" ? "inbound" : "outbound";
 
   if (!text) {
@@ -114,6 +114,7 @@ export async function POST(
       direction,
       phone: lead.tel || null,
       text,
+      message: text,
       status: "sent",
     })
     .select("id")

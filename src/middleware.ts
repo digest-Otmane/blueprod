@@ -124,8 +124,12 @@ export async function middleware(request: NextRequest) {
         );
       }
 
-      // Le Centre d'Appel n'a pas accès à la gestion de l'équipe (sauf s'il consulte la liste des commerciaux pour assigner)
-      if (pathname === "/api/users" && request.method !== "OPTIONS") {
+      // Le Centre d'Appel n'a pas accès à la gestion de l'équipe / création d'utilisateurs
+      if (
+        pathname.startsWith("/api/users") &&
+        !pathname.startsWith("/api/users/commerciaux") &&
+        request.method !== "OPTIONS"
+      ) {
         return NextResponse.json(
           { error: "Accès interdit : Réservé à l'administration." },
           { status: 403 }
@@ -142,8 +146,12 @@ export async function middleware(request: NextRequest) {
 
     // RÈGLE 2 : Commercial (Strictement restreint à sa marque et son portefeuille)
     if (role === "commercial") {
-      // Bloquer l'accès à la gestion de l'équipe
-      if (pathname === "/api/users" && request.method !== "OPTIONS") {
+      // Bloquer l'accès à la gestion de l'équipe / création d'utilisateurs
+      if (
+        pathname.startsWith("/api/users") &&
+        !pathname.startsWith("/api/users/commerciaux") &&
+        request.method !== "OPTIONS"
+      ) {
         return NextResponse.json(
           { error: "Accès interdit : Réservé à l'administration." },
           { status: 403 }

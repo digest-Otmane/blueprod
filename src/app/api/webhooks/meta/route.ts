@@ -190,6 +190,10 @@ async function ingestSingleLead(leadData: {
   const supabase = getSupabaseAdmin();
   const id = `meta-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000)}`;
 
+  const metaNoteFormatted = leadData.email
+    ? `Email: ${leadData.email}${leadData.meta_note ? " · " + leadData.meta_note : ""}`
+    : (leadData.meta_note || "Lead publicitaire Meta entrant");
+
   // Insertion dans leads avec stage 'a_qualifier' pour le Centre d'Appel
   const { error: insertErr } = await supabase.from("leads").insert({
     id,
@@ -200,12 +204,10 @@ async function ingestSingleLead(leadData: {
     commercial_id: null,
     valeur: 0,
     tel: leadData.tel || null,
-    email: leadData.email || null,
     need_type: leadData.need_type,
     date_label: "À l'instant",
     source: leadData.source || "meta",
-    meta_note: leadData.meta_note || "Lead publicitaire Meta entrant",
-    meta_lead_id: leadData.meta_lead_id || null,
+    meta_note: metaNoteFormatted,
   });
 
   if (insertErr) {
@@ -214,12 +216,14 @@ async function ingestSingleLead(leadData: {
   }
 
   // Historique initial dans les messages WhatsApp / contact
+  const metaText = `Lead généré automatiquement via campagne Meta (${leadData.source}). En attente de qualification par le Centre d'Appel.`;
   await supabase.from("lead_messages").insert({
     lead_id: id,
     from_side: "eux",
     direction: "inbound",
     phone: leadData.tel || null,
-    text: `Lead généré automatiquement via campagne Meta (${leadData.source}). En attente de qualification par le Centre d'Appel.`,
+    text: metaText,
+    message: metaText,
     status: "received",
   });
 

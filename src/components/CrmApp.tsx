@@ -7,6 +7,7 @@ import {
   PageKey,
   Client,
   Lead,
+  LeadMessage,
   Commande,
   Devis,
   Facture,
@@ -197,8 +198,16 @@ export const CrmApp: React.FC = () => {
   };
 
   const handleSendMessage = async (leadId: string, text: string) => {
-    // Optimistic update
-    const newMessage = { from: "moi" as const, text, created_at: new Date().toISOString() };
+    const newMessage: LeadMessage = {
+      from: "moi",
+      from_side: "moi",
+      direction: "outbound",
+      text,
+      status: "sent",
+      created_at: new Date().toISOString(),
+    };
+
+    // Optimistic UI update
     setLeads((prev) =>
       prev.map((l) =>
         l.id === leadId
@@ -206,16 +215,28 @@ export const CrmApp: React.FC = () => {
           : l
       )
     );
+
     try {
-      await fetchApi("/whatsapp/send", {
+      const res = await fetchApi("/whatsapp/send", {
         method: "POST",
         body: JSON.stringify({ lead_id: leadId, text }),
       });
-    } catch {
-      await fetchApi(`/leads/${leadId}/messages`, {
-        method: "POST",
-        body: JSON.stringify({ text, from_side: "moi" }),
-      });
+      if (res.message) {
+        setLeads((prev) =>
+          prev.map((l) => {
+            if (l.id !== leadId) return l;
+            const msgs = (l.messages || []).map((m) =>
+              m === newMessage ? res.message : m
+            );
+            return { ...l, messages: msgs };
+          })
+        );
+      }
+      if (res.meta_error) {
+        throw new Error(res.meta_error);
+      }
+    } catch (err: any) {
+      throw err;
     }
   };
 
@@ -381,6 +402,7 @@ export const CrmApp: React.FC = () => {
               commandes={commandes}
               factures={factures}
               onOpenFiche={(id) => setFicheLeadId(id)}
+              onOpenWa={(id) => setWaLeadId(id)}
               onSimulateMeta={handleSimulateMeta}
             />
           )}
@@ -446,7 +468,7 @@ export const CrmApp: React.FC = () => {
           )}
 
           {currentPage === "equipe" && user.role === "admin" && (
-            <EquipeList team={team} onViewAs={handleViewAs} />
+            <EquipeList team={team} onViewAs={handleViewAs} onRefresh={() => loadAll()} />
           )}
         </div>
       </main>
@@ -458,6 +480,7 @@ export const CrmApp: React.FC = () => {
           commerciaux={commerciaux}
           onClose={() => setFicheLeadId(null)}
           onSubmit={handleFicheSubmit}
+          onOpenWa={(id) => setWaLeadId(id)}
         />
       )}
 
@@ -467,6 +490,7 @@ export const CrmApp: React.FC = () => {
           commerciaux={commerciaux}
           onClose={() => setEditTarget(null)}
           onSave={handleSaveEdit}
+          onOpenWa={(id) => setWaLeadId(id)}
         />
       )}
 
@@ -484,6 +508,7 @@ export const CrmApp: React.FC = () => {
       {activeWaLead && (
         <WaModal
           lead={activeWaLead}
+          user={user}
           onClose={() => setWaLeadId(null)}
           onSendMessage={handleSendMessage}
         />

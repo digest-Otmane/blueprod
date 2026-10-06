@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { DocumentPdfData } from "./types";
 
 export function generateHtmlDocument(data: DocumentPdfData): string {
@@ -7,6 +9,22 @@ export function generateHtmlDocument(data: DocumentPdfData): string {
   const brandAccent = isLvt ? "#627B55" : "#A67C38";
   const brandLight = isLvt ? "#F4F7F3" : "#FAF7F2";
   const brandBorder = isLvt ? "#D3DDD1" : "#E2D8C9";
+
+  let logoSrc = "/images/LA VARENNE LOGO VR black.png";
+  try {
+    const logoFile = isLvt
+      ? "LA VARENNE LOGO VR black.png"
+      : "LA VARENNE LOGO VR gold.png";
+    const fullPath = path.join(process.cwd(), "public", "images", logoFile);
+    if (fs.existsSync(fullPath)) {
+      const b64 = fs.readFileSync(fullPath).toString("base64");
+      logoSrc = `data:image/png;base64,${b64}`;
+    }
+  } catch {
+    logoSrc = isLvt
+      ? "/images/LA VARENNE LOGO VR black.png"
+      : "/images/LA VARENNE LOGO VR gold.png";
+  }
 
   const formatMoney = (amount: number) =>
     Number(amount || 0).toLocaleString("fr-FR", {
@@ -265,23 +283,44 @@ export function generateHtmlDocument(data: DocumentPdfData): string {
     }
 
     @media print {
-      body { padding: 0; }
-      .top-accent { margin: 0 0 20px 0; }
+      body {
+        padding: 0;
+        background: #FFFFFF !important;
+      }
+      .top-accent { margin: 0 0 20px 0 !important; }
       .no-print { display: none !important; }
+      @page {
+        size: A4 portrait;
+        margin: 10mm 12mm 10mm 12mm;
+      }
     }
   </style>
+  <script>
+    // Ne se déclenche que si le document est ouvert directement dans un onglet autonome (pas dans l'iframe d'impression du CRM)
+    if (window.self === window.top) {
+      window.addEventListener('load', function() {
+        window.focus();
+        setTimeout(function() {
+          window.print();
+        }, 250);
+      });
+    }
+  </script>
 </head>
 <body>
   <div class="top-accent"></div>
 
   <div class="header">
-    <div>
-      <div class="brand-title">${brandName.toUpperCase()}</div>
-      <div class="company-sub">Alea Food S.A.R.L.</div>
-      <div class="company-desc">Torréfaction Artisanale & Distributeur de Café d'Excellence</div>
-      <div class="company-fisc">
-        Casablanca, Maroc | Tél: +212 5 22 44 12 00 | contact@aleafood.ma<br>
-        ICE: 002345678000045 — IF: 45678901 — RC: 123456
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <img src="${logoSrc}" alt="${brandName}" style="height: 52px; width: auto; max-width: 140px; object-fit: contain; display: block;" />
+      <div>
+        <div class="brand-title">${brandName.toUpperCase()}</div>
+        <div class="company-sub">Alea Food S.A.R.L.</div>
+        <div class="company-desc">Torréfaction Artisanale & Distributeur de Café d'Excellence</div>
+        <div class="company-fisc">
+          Casablanca, Maroc | Tél: +212 5 22 44 12 00 | contact@aleafood.ma<br>
+          ICE: 002345678000045 — IF: 45678901 — RC: 123456
+        </div>
       </div>
     </div>
     <div class="doc-meta">

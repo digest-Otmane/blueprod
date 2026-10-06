@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = getSupabaseAdmin();
-  const { error } = await supabase.from("clients").insert({
+  const rawInsert = {
     id,
     nom,
     ville,
@@ -77,13 +77,13 @@ export async function POST(request: NextRequest) {
     brands,
     contact,
     tel,
-    email,
     commercial,
     commercial_id,
     lead_id,
     need_type,
-    notes,
-  });
+  };
+
+  const { error } = await supabase.from("clients").insert(rawInsert);
 
   if (error) {
     console.error("Error creating client:", error);

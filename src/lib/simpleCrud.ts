@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "./supabase";
 import { getUserFromRequest, unauthorized, forbidden } from "./auth";
 import { effectiveBrand } from "./scope";
 import { isDevisEditable, validateDevisTransition, validateFactureTransition } from "./rbac";
+import { sanitizePayload, TableName } from "./db-schema";
 
 const FINANCIAL_TABLES = ["commandes", "devis", "factures"];
 
@@ -140,7 +141,8 @@ export function buildListPOST(table: string, allowedFields: string[]) {
     }
 
     const supabase = getSupabaseAdmin();
-    const { error } = await supabase.from(table).insert(recordToInsert);
+    const sanitizedInsert = sanitizePayload(table as TableName, recordToInsert);
+    const { error } = await supabase.from(table).insert(sanitizedInsert);
 
     if (error) {
       console.error(`Error inserting into ${table}:`, error);
@@ -152,14 +154,16 @@ export function buildListPOST(table: string, allowedFields: string[]) {
       const itemsTable = table === "devis" ? "devis_items" : table === "factures" ? "facture_items" : null;
       if (itemsTable) {
         const foreignKey = table === "devis" ? "devis_id" : "facture_id";
-        const rowsToInsert = items.map((it: any) => ({
-          [foreignKey]: id,
-          product_type: it.product_type || "achat_cafe",
-          product_name: it.product_name || "Produit standard",
-          quantity: Number(it.quantity) || 1,
-          unit_price: Number(it.unit_price) || 0,
-          total_amount: Number(it.total_amount) || (Number(it.quantity) || 1) * (Number(it.unit_price) || 0),
-        }));
+        const rowsToInsert = items.map((it: any) =>
+          sanitizePayload(itemsTable as TableName, {
+            [foreignKey]: id,
+            product_type: it.product_type || "achat_cafe",
+            product_name: it.product_name || "Produit standard",
+            quantity: Number(it.quantity) || 1,
+            unit_price: Number(it.unit_price) || 0,
+            total_amount: Number(it.total_amount) || (Number(it.quantity) || 1) * (Number(it.unit_price) || 0),
+          })
+        );
 
         const { error: itemsErr } = await supabase.from(itemsTable).insert(rowsToInsert);
         if (itemsErr) {
@@ -175,12 +179,10 @@ export function buildListPOST(table: string, allowedFields: string[]) {
       dueDate.setDate(dueDate.getDate() + 30);
       const dateStr = dueDate.toISOString().split("T")[0];
 
-      await supabase.from("factures").insert({
+      const facturePayload = sanitizePayload("factures", {
         id: factureId,
         client: recordToInsert.client,
         client_id: recordToInsert.client_id || null,
-        devis_id: id,
-        commande_id: recordToInsert.commande_id || null,
         brand: recordToInsert.brand,
         montant: recordToInsert.montant,
         statut: "emise",
@@ -188,18 +190,20 @@ export function buildListPOST(table: string, allowedFields: string[]) {
         commercial_id: recordToInsert.commercial_id,
         date_label: "Aujourd'hui",
         echeance: dateStr,
-        due_date: dueDate.toISOString(),
       });
 
+      await supabase.from("factures").insert(facturePayload);
+
       if (items.length > 0) {
-        const rowsToInsert = items.map((it: any) => ({
-          facture_id: factureId,
-          product_type: it.product_type || "achat_cafe",
-          product_name: it.product_name || "Produit standard",
-          quantity: Number(it.quantity) || 1,
-          unit_price: Number(it.unit_price) || 0,
-          total_amount: Number(it.total_amount) || (Number(it.quantity) || 1) * (Number(it.unit_price) || 0),
-        }));
+        const rowsToInsert = items.map((it: any) =>
+          sanitizePayload("facture_items", {
+            facture_id: factureId,
+            product_name: it.product_name || "Produit standard",
+            quantity: Number(it.quantity) || 1,
+            unit_price: Number(it.unit_price) || 0,
+            total_amount: Number(it.total_amount) || (Number(it.quantity) || 1) * (Number(it.unit_price) || 0),
+          })
+        );
         await supabase.from("facture_items").insert(rowsToInsert);
       }
     }
@@ -343,12 +347,10 @@ export function buildItemHandlers(table: string, extraFields: string[] = []) {
           dueDate.setDate(dueDate.getDate() + 30); // Échéance standard à 30 jours
           const dateStr = dueDate.toISOString().split("T")[0];
 
-          await supabase.from("factures").insert({
+          const facturePayload = sanitizePayload("factures", {
             id: factureId,
             client: current.client,
             client_id: current.client_id || null,
-            devis_id: current.id,
-            commande_id: current.commande_id || null,
             brand: current.brand,
             montant: current.montant,
             statut: "emise",
@@ -356,8 +358,9 @@ export function buildItemHandlers(table: string, extraFields: string[] = []) {
             commercial_id: current.commercial_id,
             date_label: "Aujourd'hui",
             echeance: dateStr,
-            due_date: dueDate.toISOString(),
           });
+
+          await supabase.from("factures").insert(facturePayload);
 
           // Copier également les devis_items vers facture_items pour intégrité financière
           const { data: devisItems } = await supabase
@@ -366,14 +369,15 @@ export function buildItemHandlers(table: string, extraFields: string[] = []) {
             .eq("devis_id", current.id);
 
           if (devisItems && devisItems.length > 0) {
-            const factureItems = devisItems.map((it: any) => ({
-              facture_id: factureId,
-              product_type: it.product_type,
-              product_name: it.product_name,
-              quantity: it.quantity,
-              unit_price: it.unit_price,
-              total_amount: it.total_amount,
-            }));
+            const factureItems = devisItems.map((it: any) =>
+              sanitizePayload("facture_items", {
+                facture_id: factureId,
+                product_name: it.product_name || "Produit standard",
+                quantity: Number(it.quantity) || 1,
+                unit_price: Number(it.unit_price) || 0,
+                total_amount: Number(it.total_amount) || (Number(it.quantity) || 1) * (Number(it.unit_price) || 0),
+              })
+            );
             await supabase.from("facture_items").insert(factureItems);
           }
         }
@@ -403,13 +407,15 @@ export function buildItemHandlers(table: string, extraFields: string[] = []) {
       }
     }
 
-    if (!Object.keys(updates).length) {
+    const sanitizedUpdates = sanitizePayload(table as TableName, updates);
+
+    if (!Object.keys(sanitizedUpdates).length) {
       return NextResponse.json({ error: "Aucun champ à modifier." }, { status: 400 });
     }
 
     const { error: updateErr } = await supabase
       .from(table)
-      .update(updates)
+      .update(sanitizedUpdates)
       .eq("id", params.id);
 
     if (updateErr) {
@@ -421,14 +427,16 @@ export function buildItemHandlers(table: string, extraFields: string[] = []) {
     if (table === "devis" && isDevisEditable(current.statut) && Array.isArray(body.items)) {
       await supabase.from("devis_items").delete().eq("devis_id", params.id);
       if (body.items.length > 0) {
-        const rows = body.items.map((it: any) => ({
-          devis_id: params.id,
-          product_type: it.product_type || "achat_cafe",
-          product_name: it.product_name || "Produit standard",
-          quantity: Number(it.quantity) || 1,
-          unit_price: Number(it.unit_price) || 0,
-          total_amount: Number(it.total_amount) || (Number(it.quantity) || 1) * (Number(it.unit_price) || 0),
-        }));
+        const rows = body.items.map((it: any) =>
+          sanitizePayload("devis_items", {
+            devis_id: params.id,
+            product_type: it.product_type || "achat_cafe",
+            product_name: it.product_name || "Produit standard",
+            quantity: Number(it.quantity) || 1,
+            unit_price: Number(it.unit_price) || 0,
+            total_amount: Number(it.total_amount) || (Number(it.quantity) || 1) * (Number(it.unit_price) || 0),
+          })
+        );
         await supabase.from("devis_items").insert(rows);
       }
     }

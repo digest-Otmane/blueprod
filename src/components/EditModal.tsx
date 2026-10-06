@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import { CommercialUser } from "@/types/crm";
+import { printDocumentDirectly } from "@/lib/printHelper";
 
 interface EditModalProps {
   target: { type: string; id: string; item: any } | null;
   commerciaux: CommercialUser[];
   onClose: () => void;
   onSave: (type: string, id: string, data: any) => Promise<void>;
+  onOpenWa?: (leadId: string) => void;
 }
 
 export const EditModal: React.FC<EditModalProps> = ({
@@ -15,6 +17,7 @@ export const EditModal: React.FC<EditModalProps> = ({
   commerciaux,
   onClose,
   onSave,
+  onOpenWa,
 }) => {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
@@ -112,16 +115,43 @@ export const EditModal: React.FC<EditModalProps> = ({
             <div className="who">{getTitle()}</div>
             <div className="sub2">{getSubtitle()}</div>
           </div>
-          <button
-            type="button"
-            className="fiche-modal-close"
-            onClick={onClose}
-            aria-label="Fermer"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />
-            </svg>
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "auto" }}>
+            {type === "lead" && onOpenWa && (
+              <button
+                type="button"
+                className="btn-ghost"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontSize: "0.78rem",
+                  color: "#3FBF63",
+                  border: "1px solid rgba(63, 191, 99, 0.3)",
+                  background: "rgba(63, 191, 99, 0.08)",
+                  borderRadius: "8px",
+                  padding: "5px 10px",
+                  cursor: "pointer",
+                }}
+                onClick={() => onOpenWa(id)}
+                title="Ouvrir la conversation WhatsApp"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 14, height: 14 }}>
+                  <path d="M12 2C6.5 2 2 6.3 2 11.6c0 1.8.5 3.5 1.4 5L2 22l5.6-1.4c1.5.8 3.1 1.2 4.4 1.2 5.5 0 10-4.3 10-9.7S17.5 2 12 2Z" />
+                </svg>
+                Chat WhatsApp
+              </button>
+            )}
+            <button
+              type="button"
+              className="fiche-modal-close"
+              onClick={onClose}
+              aria-label="Fermer"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="fiche-modal-body">
@@ -499,12 +529,11 @@ export const EditModal: React.FC<EditModalProps> = ({
                 color: "var(--accent-strong, var(--accent))",
               }}
               onClick={() =>
-                window.open(
-                  `/api/${type === "devis" ? "devis" : "factures"}/${id}/pdf`,
-                  "_blank"
+                printDocumentDirectly(
+                  `/api/${type === "devis" ? "devis" : "factures"}/${id}/pdf`
                 )
               }
-              title="Télécharger le document PDF"
+              title="Imprimer / Enregistrer en PDF"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -513,7 +542,7 @@ export const EditModal: React.FC<EditModalProps> = ({
                 <line x1="16" y1="17" x2="8" y2="17" />
                 <polyline points="10 9 9 9 8 9" />
               </svg>
-              Télécharger PDF
+              Imprimer / PDF
             </button>
           )}
           <button type="button" className="btn-ghost" onClick={onClose} disabled={loading}>

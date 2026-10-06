@@ -53,21 +53,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
       <aside className={`sidebar ${isMobileOpen ? "mobile-open" : ""}`}>
-        <div className="brandmark">
-          <span
-            className="mark logo-mark"
+        <div
+          className="brandmark"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "8px 6px 16px",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+            marginBottom: "10px",
+          }}
+        >
+          <div
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "var(--gold)",
-              fontFamily: "'Fraunces',serif",
-              fontWeight: 700,
+              width: "100%",
             }}
           >
-            LV
-          </span>
-          La Varenne
+            <img
+              src="/images/LA VARENNE LOGO VR white.png"
+              alt="La Varenne"
+              style={{
+                maxHeight: "48px",
+                maxWidth: "185px",
+                width: "auto",
+                height: "auto",
+                objectFit: "contain",
+                display: "block",
+              }}
+            />
+          </div>
           {isMobileOpen && (
             <button
               type="button"
@@ -79,7 +96,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
         </div>
-        <div className="brand-sub">CRM interne — Alea Food</div>
 
         <nav className="mainnav">
           <button

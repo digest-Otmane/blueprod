@@ -54,13 +54,14 @@ export async function POST(request: NextRequest) {
         // Traitement des statuts de délivrance (sent, delivered, read, failed)
         if (Array.isArray(val.statuses)) {
           for (const statusObj of val.statuses) {
-            const waMsgId = statusObj.id;
+            const recipientPhone = statusObj.recipient_id;
             const newStatus = statusObj.status; // 'sent' | 'delivered' | 'read' | 'failed'
-            if (waMsgId && newStatus) {
+            if (recipientPhone && newStatus) {
+              const norm = normalizePhoneNumber(recipientPhone);
               await supabase
                 .from("lead_messages")
                 .update({ status: newStatus })
-                .eq("wa_message_id", waMsgId);
+                .ilike("phone", `%${norm.slice(-9)}`);
             }
           }
         }
@@ -126,10 +127,9 @@ export async function POST(request: NextRequest) {
               from_side: "eux",
               direction: "inbound",
               phone: fromNumber,
-              wa_message_id: waMsgId,
               text: messageText,
+              message: messageText,
               status: "received",
-              raw_payload: msg,
             });
           }
         }

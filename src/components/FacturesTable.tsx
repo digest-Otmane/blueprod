@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { User, Facture } from "@/types/crm";
+import { printDocumentDirectly } from "@/lib/printHelper";
 
 interface FacturesTableProps {
   user: User;
@@ -107,9 +108,9 @@ export const FacturesTable: React.FC<FacturesTableProps> = ({
                           <button
                             type="button"
                             className="icon-btn"
-                            title="Télécharger le PDF (La Varenne)"
-                            onClick={() => window.open(`/api/factures/${f.id}/pdf`, "_blank")}
-                            aria-label={`Télécharger le PDF de la facture ${f.id}`}
+                            title="Imprimer / Enregistrer en PDF"
+                            onClick={() => printDocumentDirectly(`/api/factures/${f.id}/pdf`)}
+                            aria-label={`Imprimer la facture ${f.id}`}
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />

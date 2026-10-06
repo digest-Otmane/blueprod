@@ -141,30 +141,30 @@ export async function GET(
 
   const { searchParams } = new URL(request.url);
   const format = searchParams.get("format");
-  const isDownload = searchParams.get("download") === "1";
 
-  if (format === "html") {
-    const html = generateHtmlDocument(pdfData);
-    return new NextResponse(html, {
+  // Fallback binaire si explicitement demandé avec format=raw_pdf
+  if (format === "raw_pdf") {
+    const pdfBuffer = generateDocumentPdf(pdfData);
+    const filename = `Facture_${facture.id}.pdf`;
+    return new NextResponse(new Uint8Array(pdfBuffer) as unknown as BodyInit, {
       status: 200,
       headers: {
-        "Content-Type": "text/html; charset=utf-8",
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="${filename}"`,
+        "Content-Length": String(pdfBuffer.length),
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "private, no-cache, no-store, must-revalidate",
       },
     });
   }
 
-  // Générer le PDF binaire 100% autonome
-  const pdfBuffer = generateDocumentPdf(pdfData);
-  const filename = `Facture_${facture.id}.pdf`;
-  const disposition = isDownload ? "attachment" : "inline";
-
-  return new NextResponse(new Uint8Array(pdfBuffer) as unknown as BodyInit, {
+  // Vue HTML optimisée pour l'aperçu et l'impression native du navigateur
+  const html = generateHtmlDocument(pdfData);
+  return new NextResponse(html, {
     status: 200,
     headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `${disposition}; filename="${filename}"`,
-      "Content-Length": String(pdfBuffer.length),
-      "Cache-Control": "private, max-age=0, must-revalidate",
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "private, no-cache, no-store, must-revalidate",
     },
   });
 }

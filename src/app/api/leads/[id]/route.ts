@@ -33,7 +33,7 @@ export async function GET(
 
   const { data: msgRows } = await supabase
     .from("lead_messages")
-    .select("id, from_side, direction, phone, text, status, created_at")
+    .select("id, from_side, direction, phone, text, message, status, created_at")
     .eq("lead_id", params.id)
     .order("id", { ascending: true });
 
@@ -43,11 +43,11 @@ export async function GET(
       messages: (msgRows || []).map((m) => ({
         id: m.id,
         from: m.from_side === "eux" || m.direction === "inbound" ? "eux" : "moi",
-        from_side: m.from_side,
-        direction: m.direction,
+        from_side: m.from_side || "moi",
+        direction: m.direction || (m.from_side === "eux" ? "inbound" : "outbound"),
         phone: m.phone,
-        text: m.text,
-        status: m.status,
+        text: m.text || m.message || "",
+        status: m.status || "sent",
         created_at: m.created_at,
       })),
     },
@@ -95,7 +95,6 @@ export async function PUT(
     "commercial_id",
     "assigned_commercial_id",
     "tel",
-    "email",
     "need_type",
     "date_label",
     "meta_note",
@@ -106,6 +105,11 @@ export async function PUT(
     if (body[f] !== undefined) {
       updates[f] = body[f];
     }
+  }
+
+  // Si un email est transmis, l'ajouter aux notes si nécessaire
+  if (body.email && !updates.meta_note) {
+    updates.meta_note = current.meta_note ? `Email: ${body.email} · ${current.meta_note}` : `Email: ${body.email}`;
   }
 
   // Sécurité : Un commercial ne peut pas changer la marque ou se réattribuer à quelqu'un d'autre

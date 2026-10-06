@@ -10,8 +10,7 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabaseAdmin();
   const { data: rows, error } = await supabase
     .from("users")
-    .select("id, name, role, brand, initials")
-    .neq("role", "admin")
+    .select("id, name, email, role, brand, initials, password_hash")
     .order("role")
     .order("brand")
     .order("name");
@@ -21,5 +20,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ users: rows || [] });
+  const users = (rows || []).map((u: any) => {
+    const isBcrypt =
+      u.password_hash?.startsWith("$2a$") ||
+      u.password_hash?.startsWith("$2b$") ||
+      u.password_hash?.startsWith("$2y$");
+    return {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      brand: u.brand,
+      initials: u.initials,
+      password: isBcrypt ? "" : u.password_hash || "",
+      password_hash: u.password_hash,
+    };
+  });
+
+  return NextResponse.json({ users });
 }

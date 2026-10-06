@@ -10,6 +10,7 @@ interface DashboardProps {
   factures: Facture[];
   onOpenFiche: (leadId: string) => void;
   onSimulateMeta: () => Promise<void>;
+  onOpenWa?: (leadId: string) => void;
 }
 
 const STAGES: Array<{ key: LeadStage; label: string }> = [
@@ -38,6 +39,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   factures,
   onOpenFiche,
   onSimulateMeta,
+  onOpenWa,
 }) => {
   const isAdmin = user.role === "admin";
   const isCentreAppel = user.role === "centre_appel";
@@ -156,13 +158,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                   )}
                 </div>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => onOpenFiche(l.id)}
-                >
-                  Traiter l&apos;appel
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  {onOpenWa && (
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        color: "#3FBF63",
+                        border: "1px solid rgba(63, 191, 99, 0.3)",
+                        background: "rgba(63, 191, 99, 0.08)",
+                        borderRadius: "9px",
+                      }}
+                      onClick={() => onOpenWa(l.id)}
+                      title="Discuter sur WhatsApp"
+                    >
+                      <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 14, height: 14 }}>
+                        <path d="M12 2C6.5 2 2 6.3 2 11.6c0 1.8.5 3.5 1.4 5L2 22l5.6-1.4c1.5.8 3.1 1.2 4.4 1.2 5.5 0 10-4.3 10-9.7S17.5 2 12 2Z" />
+                      </svg>
+                      WhatsApp
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => onOpenFiche(l.id)}
+                  >
+                    Traiter l&apos;appel
+                  </button>
+                </div>
               </div>
             </div>
           ))

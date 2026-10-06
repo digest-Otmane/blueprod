@@ -293,13 +293,32 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             </span>
                           )}
 
+                          {/* Bouton direct WhatsApp */}
+                          <button
+                            type="button"
+                            className="kcard-wa-btn"
+                            title="Discuter sur WhatsApp"
+                            aria-label="Discuter sur WhatsApp"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenWa(l.id);
+                            }}
+                          >
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 2C6.5 2 2 6.3 2 11.6c0 1.8.5 3.5 1.4 5L2 22l5.6-1.4c1.5.8 3.1 1.2 4.4 1.2 5.5 0 10-4.3 10-9.7S17.5 2 12 2Z" />
+                            </svg>
+                            {l.messages && l.messages.length > 0 && (
+                              <span className="kcard-wa-count">{l.messages.length}</span>
+                            )}
+                          </button>
+
                           {/* Menu 3 points pour transfert d'étape */}
                           <div className="kcard-menu-wrap">
                             <button
                               type="button"
                               className={`kcard-dots-btn ${isMenuOpen ? "active" : ""}`}
-                              title="Déplacer vers une autre étape"
-                              aria-label="Déplacer vers une autre étape"
+                              title="Options du lead"
+                              aria-label="Options du lead"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setOpenMenuLeadId(isMenuOpen ? null : l.id);
@@ -317,6 +336,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                 className="kcard-dropdown"
                                 onClick={(e) => e.stopPropagation()}
                               >
+                                <button
+                                  type="button"
+                                  className="kcard-dropdown-item wa-action"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenMenuLeadId(null);
+                                    onOpenWa(l.id);
+                                  }}
+                                >
+                                  <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 14, height: 14, color: "#3FBF63" }}>
+                                    <path d="M12 2C6.5 2 2 6.3 2 11.6c0 1.8.5 3.5 1.4 5L2 22l5.6-1.4c1.5.8 3.1 1.2 4.4 1.2 5.5 0 10-4.3 10-9.7S17.5 2 12 2Z" />
+                                  </svg>
+                                  <span>Chat WhatsApp</span>
+                                </button>
+                                <div className="kcard-dropdown-divider" />
                                 <div className="kcard-dropdown-head">Déplacer vers :</div>
                                 {visibleStages.map((target) => (
                                   <button
@@ -429,10 +463,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                         </div>
                       )}
 
-                      {lastMsg && (
+                      {lastMsg ? (
                         <div
                           className="kwa"
-                          title="Ouvrir la conversation"
+                          title="Ouvrir la conversation WhatsApp"
                           onClick={(e) => {
                             e.stopPropagation();
                             onOpenWa(l.id);
@@ -445,6 +479,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             {(lastMsg.from === "moi" ? "Vous : " : "") + lastMsg.text}
                           </span>
                         </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="kcard-wa-start-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenWa(l.id);
+                          }}
+                          title="Lancer une conversation WhatsApp avec ce lead"
+                        >
+                          <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.5 2 2 6.3 2 11.6c0 1.8.5 3.5 1.4 5L2 22l5.6-1.4c1.5.8 3.1 1.2 4.4 1.2 5.5 0 10-4.3 10-9.7S17.5 2 12 2Z" />
+                          </svg>
+                          <span>Chat WhatsApp</span>
+                        </button>
                       )}
                     </div>
                   );
