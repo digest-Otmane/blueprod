@@ -28,6 +28,8 @@ import { FicheModal } from "./FicheModal";
 import { EditModal } from "./EditModal";
 import { CreateModal } from "./CreateModal";
 import { WaModal } from "./WaModal";
+import { SplashScreen } from "./SplashScreen";
+import { ConfirmModal } from "./ConfirmModal";
 
 export const CrmApp: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -50,6 +52,8 @@ export const CrmApp: React.FC = () => {
   const [waLeadId, setWaLeadId] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<{ type: string; id: string; item: any } | null>(null);
   const [createType, setCreateType] = useState<"client" | "lead" | "commande" | "devis" | "facture" | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // API helper
   const fetchApi = useCallback(async (path: string, options?: RequestInit) => {
@@ -301,10 +305,13 @@ export const CrmApp: React.FC = () => {
     await loadAll();
   };
 
-  const handleDeleteItem = async (type: string, id: string) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer cet élément définitivement ?")) {
-      return;
-    }
+  const handleDeleteItem = (type: string, id: string) => {
+    setDeleteTarget({ type, id });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    const { type, id } = deleteTarget;
     const collectionMap: Record<string, string> = {
       client: "clients",
       lead: "leads",
@@ -313,11 +320,15 @@ export const CrmApp: React.FC = () => {
       facture: "factures",
     };
     const endpoint = collectionMap[type] || type;
+    setIsDeleting(true);
     try {
       await fetchApi(`/${endpoint}/${id}`, { method: "DELETE" });
       await loadAll();
+      setDeleteTarget(null);
     } catch (err: any) {
       alert(err.message || "Erreur lors de la suppression.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -338,21 +349,7 @@ export const CrmApp: React.FC = () => {
   };
 
   if (loadingInitial) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          height: "100vh",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "var(--gold)",
-          fontFamily: "'Fraunces', serif",
-          fontSize: "1.2rem",
-        }}
-      >
-        Chargement du CRM...
-      </div>
-    );
+    return <SplashScreen />;
   }
 
   if (!user) {
@@ -373,7 +370,7 @@ export const CrmApp: React.FC = () => {
   const activeWaLead = waLeadId ? leads.find((l) => l.id === waLeadId) || null : null;
 
   return (
-    <div className="app">
+    <div className={`app ${currentPage === "leads" ? "app-leads" : ""}`}>
       <Sidebar
         user={user}
         currentPage={currentPage}
@@ -384,7 +381,7 @@ export const CrmApp: React.FC = () => {
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
-      <main>
+      <main className={currentPage === "leads" ? "main-leads" : ""}>
         <Topbar
           user={user}
           currentPage={currentPage}
@@ -394,7 +391,7 @@ export const CrmApp: React.FC = () => {
           onToggleMobileSidebar={() => setIsMobileSidebarOpen((prev) => !prev)}
         />
 
-        <div className="content">
+        <div className={`content ${currentPage === "leads" ? "content-leads" : ""}`}>
           {currentPage === "dashboard" && (
             <Dashboard
               user={user}
@@ -513,6 +510,15 @@ export const CrmApp: React.FC = () => {
           onSendMessage={handleSendMessage}
         />
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => {
+          if (!isDeleting) setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 };

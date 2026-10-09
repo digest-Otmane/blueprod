@@ -31,12 +31,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return `Commercial · ${user.brand === "lv" ? "La Varenne" : "La Varenne Touch"}`;
   };
 
-  const getAvatarColor = () => {
-    if (user.brand === "lvt") return "var(--accent-touch)";
-    if (user.brand === "all") return "var(--gold)";
-    return "var(--accent)";
-  };
-
   const handleNavClick = (page: PageKey) => {
     onNavigate(page);
     onCloseMobile();
@@ -60,23 +54,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
             alignItems: "center",
             justifyContent: "space-between",
             padding: "8px 6px 16px",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
-            marginBottom: "10px",
+            marginBottom: "8px",
           }}
         >
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
+              justifyContent: "flex-start",
               width: "100%",
             }}
           >
             <img
-              src="/images/LA VARENNE LOGO VR white.png"
+              src="/tableau de bord/rectangle logo.png"
               alt="La Varenne"
               style={{
-                maxHeight: "48px",
+                maxHeight: "38px",
                 maxWidth: "185px",
                 width: "auto",
                 height: "auto",
@@ -217,15 +210,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
 
         <div className="sidebar-foot">
-          <p className="navlabel" style={{ padding: "0 2px 8px" }}>
+          <p className="sidebar-foot-title">
             Connecté en tant que
           </p>
           <div className="switcher-wrap">
             <div className="user-chip">
-              <div
-                className="avatar"
-                style={{ color: getAvatarColor() }}
-              >
+              <div className="avatar">
                 {user.initials}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>

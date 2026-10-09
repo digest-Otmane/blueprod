@@ -121,27 +121,43 @@ export async function GET(
 
   // Fallback binaire si explicitement demandé avec format=raw_pdf
   if (format === "raw_pdf") {
-    const pdfBuffer = generateDocumentPdf(pdfData);
-    const filename = `Devis_${devis.id}.pdf`;
-    return new NextResponse(new Uint8Array(pdfBuffer) as unknown as BodyInit, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${filename}"`,
-        "Content-Length": String(pdfBuffer.length),
-        "Accept-Ranges": "bytes",
-        "Cache-Control": "private, no-cache, no-store, must-revalidate",
-      },
-    });
+    try {
+      const pdfBuffer = generateDocumentPdf(pdfData);
+      const filename = `Devis_${devis.id}.pdf`;
+      return new NextResponse(new Uint8Array(pdfBuffer) as unknown as BodyInit, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Content-Length": String(pdfBuffer.length),
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "private, no-cache, no-store, must-revalidate",
+        },
+      });
+    } catch (pdfErr) {
+      console.error("Error generating raw PDF for devis:", pdfErr);
+      return NextResponse.json(
+        { error: "Échec de génération du document PDF." },
+        { status: 500 }
+      );
+    }
   }
 
   // Vue HTML optimisée pour l'aperçu et l'impression native du navigateur
-  const html = generateHtmlDocument(pdfData);
-  return new NextResponse(html, {
-    status: 200,
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "private, no-cache, no-store, must-revalidate",
-    },
-  });
+  try {
+    const html = generateHtmlDocument(pdfData);
+    return new NextResponse(html, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "private, no-cache, no-store, must-revalidate",
+      },
+    });
+  } catch (htmlErr) {
+    console.error("Error generating HTML preview for devis:", htmlErr);
+    return NextResponse.json(
+      { error: "Échec de génération de l'aperçu du document." },
+      { status: 500 }
+    );
+  }
 }

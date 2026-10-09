@@ -54,23 +54,18 @@ function mapProductType(type?: string): string {
 export function generateDocumentPdf(data: DocumentPdfData): Buffer {
   const isLvt = data.brand === "lvt";
   const docTypeLabel = data.type === "devis" ? "DEVIS" : "FACTURE";
-  const docTitle = `${docTypeLabel} ${data.id} - ${data.client}`;
+  const docTitle = `${docTypeLabel} ${data.id} - ${data.client || "Client"}`;
 
   const pdf = new PdfDoc(docTitle, `Document commercial Alea Food`);
 
-  // Brand Palette
-  const brandPrimary = isLvt ? "#627B55" : "#A67C38";
-  const brandDark = "#161310";
-  const brandLightBg = isLvt ? "#F4F7F3" : "#FAF7F2";
-  const brandBorder = isLvt ? "#D3DDD1" : "#E2D8C9";
-  const textDark = "#1C1917";
-  const textMuted = "#6B655B";
-  const tableHeaderBg = isLvt ? "#4F6644" : "#2A231C";
-
-  // Top slim luxury accent banner
-  pdf.drawRect(0, 0, pdf.pageWidth, 6, {
-    fillColor: brandPrimary,
-  });
+  // Brand Palette (Clean Monochrome Design)
+  const brandPrimary = "#000000";
+  const brandDark = "#000000";
+  const brandLightBg = "#F9FAFB";
+  const brandBorder = "#E5E7EB";
+  const textDark = "#111827";
+  const textMuted = "#6B7280";
+  const tableHeaderBg = "#000000";
 
   // 1. HEADER SECTION
   let y = 30;
@@ -85,7 +80,7 @@ export function generateDocumentPdf(data: DocumentPdfData): Buffer {
   pdf.drawText(isLvt ? "LVT" : "LV", 54, y + 21, {
     font: "F2",
     size: 11,
-    color: isLvt ? "#A9BE97" : "#E3B453",
+    color: brandPrimary,
     align: "center",
   });
 
@@ -475,8 +470,9 @@ export function generateDocumentPdf(data: DocumentPdfData): Buffer {
     color: brandPrimary,
   });
 
+  const clientRef = (data.client || "Client").substring(0, 16);
   pdf.drawText(
-    `Indication du virement : « ${data.id} - ${data.client.substring(0, 16)} »`,
+    `Indication du virement : « ${data.id} - ${clientRef} »`,
     tableX + 10,
     y + 61,
     { font: "F1", size: 7.2, color: textMuted }

@@ -22,14 +22,14 @@ const STAGES: Array<{ key: LeadStage; label: string }> = [
   { key: "perdu", label: "Perdu" },
 ];
 
-const STAGE_COLOR: Record<LeadStage, string> = {
-  a_qualifier: "var(--danger)",
-  nouveau: "var(--text-muted)",
-  contacte: "var(--gold)",
-  qualifie: "var(--accent)",
-  attribue: "var(--accent-touch)",
-  converti: "var(--success)",
-  perdu: "var(--danger)",
+const STAGE_CONFIG: Record<LeadStage, { color: string; glow?: boolean }> = {
+  a_qualifier: { color: "#9CA8FC" },
+  nouveau: { color: "#A7F3D0" },
+  contacte: { color: "#38BDF8", glow: true },
+  qualifie: { color: "#F472B6" },
+  attribue: { color: "#C084FC" },
+  converti: { color: "#64748B" },
+  perdu: { color: "#64748B" },
 };
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -45,7 +45,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const isCentreAppel = user.role === "centre_appel";
 
   const formatMoney = (n: number) =>
-    Number(n || 0).toLocaleString("fr-FR") + " DH";
+    Number(n || 0).toLocaleString("fr-FR").replace(/\s/g, "") + " DH";
+
+  const formatCount = (n: number) => String(n || 0).padStart(2, "0");
 
   const brandBadge = (b: "lv" | "lvt") => (
     <span className={`badge ${b === "lv" ? "brand-lv" : "brand-lvt"}`}>
@@ -76,21 +78,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return (
       <div className="page active">
         <div className="kpi-grid">
-          <div className="kpi">
+          <div className="kpi kpi-card-tint">
             <div className="label">Leads à qualifier</div>
-            <div className="value">{queue.length}</div>
+            <div className="value">{formatCount(queue.length)}</div>
           </div>
-          <div className="kpi">
+          <div className="kpi kpi-card-white">
             <div className="label">Appels traités</div>
-            <div className="value">{qualifies.length}</div>
+            <div className="value">{formatCount(qualifies.length)}</div>
           </div>
-          <div className="kpi">
+          <div className="kpi kpi-card-tint">
             <div className="label">Leads chauds identifiés</div>
-            <div className="value">{chauds}</div>
+            <div className="value">{formatCount(chauds)}</div>
           </div>
-          <div className="kpi">
+          <div className="kpi kpi-card-white">
             <div className="label">Convertis après mon appel</div>
-            <div className="value">{convertisApresAppel}</div>
+            <div className="value">{formatCount(convertisApresAppel)}</div>
           </div>
         </div>
 
@@ -110,9 +112,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <p className="sub">Nouveaux leads des deux marques, dans l&apos;ordre d&apos;arrivée</p>
           </div>
           <button
-            className="btn-ghost"
+            className="btn-secondary"
             type="button"
-            style={{ border: "1px solid var(--border)", borderRadius: "9px" }}
             onClick={onSimulateMeta}
           >
             Simuler un lead Facebook/Instagram
@@ -134,10 +135,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div>
                   <div
                     style={{
-                      fontFamily: "'Fraunces',serif",
+                      fontFamily: "'Inter', sans-serif",
                       fontWeight: 600,
                       fontSize: "1.02rem",
-                      color: "var(--text)",
+                      color: "#FFFFFF",
                       display: "flex",
                       alignItems: "center",
                       gap: "8px",
@@ -167,10 +168,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         display: "inline-flex",
                         alignItems: "center",
                         gap: "6px",
+                        fontSize: "0.82rem",
                         color: "#3FBF63",
                         border: "1px solid rgba(63, 191, 99, 0.3)",
                         background: "rgba(63, 191, 99, 0.08)",
                         borderRadius: "9px",
+                        padding: "8px 14px",
                       }}
                       onClick={() => onOpenWa(l.id)}
                       title="Discuter sur WhatsApp"
@@ -194,7 +197,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           ))
         ) : (
           <div className="empty-state">
-            File d&apos;attente vide — tous les leads ont été qualifiés. 👏
+            File d&apos;attente vide — tous les leads ont été qualifiés.
           </div>
         )}
       </div>
@@ -232,52 +235,61 @@ export const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="page active">
       <div className="kpi-grid">
-        <div className="kpi">
+        <div className="kpi kpi-card-tint">
           <div className="label">Chiffre d&apos;affaires (commandes)</div>
           <div className="value">{formatMoney(caTotal)}</div>
-          <div className="delta up">{commandes.length} commandes</div>
+          <div className="delta">{formatCount(commandes.length)} commandes</div>
         </div>
-        <div className="kpi">
+        <div className="kpi kpi-card-white">
           <div className="label">Leads actifs</div>
-          <div className="value">{activeLeads}</div>
-          <div className="delta up">Pipeline en cours</div>
+          <div className="value">{formatCount(activeLeads)}</div>
+          <div className="delta">Pipeline en cours</div>
         </div>
-        <div className="kpi">
+        <div className="kpi kpi-card-tint">
           <div className="label">Taux de conversion</div>
           <div className="value">{tauxConv}%</div>
-          <div className={`delta ${tauxConv >= 50 ? "up" : "down"}`}>
-            {convertis} convertis / {perdus} perdus
+          <div className="delta">
+            {formatCount(convertis)} convertis / {formatCount(perdus)} perdus
           </div>
         </div>
-        <div className="kpi">
+        <div className="kpi kpi-card-white">
           <div className="label">Factures en retard</div>
-          <div className="value">{enRetard}</div>
-          <div className={`delta ${enRetard ? "down" : "up"}`}>
-            {enAttente} commandes en attente
+          <div className="value">{formatCount(enRetard)}</div>
+          <div className="delta">
+            {formatCount(enAttente)} commandes en attente
           </div>
         </div>
       </div>
 
-      <div className="panel">
+      <div className="funnel-panel">
         <h2>Entonnoir des leads</h2>
         <p className="sub">
           {isAdmin ? "Vue complète, tous commerciaux" : "Votre portefeuille"}
         </p>
-        {stageCounts.map((s) => (
-          <div key={s.key} className="funnel-row">
-            <span className="fname">{s.label}</span>
-            <div className="ftrack">
-              <div
-                className="ffill"
-                style={{
-                  width: `${(s.n / maxStage) * 100}%`,
-                  background: STAGE_COLOR[s.key],
-                }}
-              />
-            </div>
-            <span className="fval">{s.n}</span>
-          </div>
-        ))}
+        <div className="funnel-list">
+          {stageCounts.map((s) => {
+            const config = STAGE_CONFIG[s.key] || { color: "#64748B" };
+            const barWidth =
+              s.n > 0 ? Math.max(6, Math.min(100, (s.n / maxStage) * 75)) : 0;
+            return (
+              <div key={s.key} className="funnel-row">
+                <span className="fname">{s.label}</span>
+                <div className="ftrack">
+                  {s.n > 0 && (
+                    <div
+                      className={`ffill ${config.glow ? "ffill-glow" : ""}`}
+                      style={{
+                        width: `${barWidth}%`,
+                        backgroundColor: config.color,
+                      }}
+                    />
+                  )}
+                </div>
+                <span className="fval">{formatCount(s.n)}</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

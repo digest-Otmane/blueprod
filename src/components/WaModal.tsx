@@ -10,58 +10,6 @@ interface WaModalProps {
   onSendMessage: (leadId: string, text: string) => Promise<void>;
 }
 
-interface QuickTemplate {
-  label: string;
-  emoji: string;
-  getText: (name: string, brand: string) => string;
-}
-
-const TEMPLATES: QuickTemplate[] = [
-  {
-    label: "Prise de contact",
-    emoji: "👋",
-    getText: (name, brand) =>
-      `Bonjour ${name || ""}, je suis du service client ${
-        brand === "lvt" ? "La Varenne Touch" : "La Varenne"
-      }. J'ai bien reçu votre demande et je me tiens à votre disposition pour vous conseiller !`,
-  },
-  {
-    label: "Catalogue & Offres",
-    emoji: "☕",
-    getText: (name, brand) =>
-      `Bonjour ${name || ""}, suite à votre intérêt pour ${
-        brand === "lvt" ? "La Varenne Touch" : "La Varenne"
-      }, souhaitez-vous recevoir notre catalogue de cafés de spécialité et nos offres machines ?`,
-  },
-  {
-    label: "Proposition de RDV",
-    emoji: "📅",
-    getText: (name) =>
-      `Bonjour ${name || ""}, quel serait le moment le plus opportun pour un court échange téléphonique afin d'évaluer vos besoins ?`,
-  },
-  {
-    label: "Relance proposition",
-    emoji: "🤝",
-    getText: (name) =>
-      `Bonjour ${name || ""}, avez-vous pu prendre connaissance de notre proposition ? N'hésitez pas si vous avez la moindre question.`,
-  },
-  {
-    label: "Coordonnées / Adresse",
-    emoji: "📍",
-    getText: (name) =>
-      `Bonjour ${name || ""}, pourriez-vous nous confirmer l'adresse de votre établissement ainsi que la ville de livraison souhaitée ?`,
-  },
-];
-
-const STAGE_LABELS: Record<string, string> = {
-  a_qualifier: "À qualifier",
-  nouveau: "Nouveau",
-  contacte: "Contacté",
-  qualifie: "Qualifié",
-  attribue: "Attribué",
-  converti: "Converti",
-  perdu: "Perdu",
-};
 
 export const WaModal: React.FC<WaModalProps> = ({
   lead,
@@ -73,12 +21,10 @@ export const WaModal: React.FC<WaModalProps> = ({
   const [inputText, setInputText] = useState("");
   const [sending, setSending] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [showTemplates, setShowTemplates] = useState(false);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
 
   const threadEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const isMountedRef = useRef(true);
 
   // Synchronisation initiale des messages du lead
@@ -105,7 +51,6 @@ export const WaModal: React.FC<WaModalProps> = ({
       const data = await res.json();
       if (data.messages && isMountedRef.current) {
         setMessages((prev) => {
-          // Évite le re-render inutile si le nombre et le dernier id sont identiques
           if (
             prev.length === data.messages.length &&
             JSON.stringify(prev) === JSON.stringify(data.messages)
@@ -153,32 +98,14 @@ export const WaModal: React.FC<WaModalProps> = ({
 
   if (!lead) return null;
 
-  const initialsOf = (name: string) =>
-    (name || "")
-      .split(" ")
-      .filter(Boolean)
-      .map((w) => w[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "WA";
+  const initialsOf = (name: string) => {
+    const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "PB";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
 
   const firstName = (lead.client || "").split(" ")[0] || "";
-
-  const handleCopyPhone = () => {
-    if (!lead.tel) return;
-    navigator.clipboard.writeText(lead.tel);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleApplyTemplate = (tmpl: QuickTemplate) => {
-    const text = tmpl.getText(firstName, lead.brand);
-    setInputText(text);
-    setShowTemplates(false);
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
-  };
 
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -210,7 +137,6 @@ export const WaModal: React.FC<WaModalProps> = ({
 
     try {
       await onSendMessage(lead.id, text);
-      // Recharger pour confirmer la sauvegarde DB et l'id officiel
       setTimeout(() => fetchMessages(true), 600);
     } catch (err: any) {
       setErrorNotice(err.message || "Erreur lors de l'envoi du message WhatsApp.");
@@ -219,12 +145,6 @@ export const WaModal: React.FC<WaModalProps> = ({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
 
   // Formatage des heures (ex: "14:32")
   const formatMsgTime = (timestamp?: string) => {
@@ -256,288 +176,190 @@ export const WaModal: React.FC<WaModalProps> = ({
     }
   };
 
-  const cleanPhoneForLink = (lead.tel || "").replace(/\D/g, "");
-  const waExternalUrl = cleanPhoneForLink
-    ? `https://wa.me/${
-        cleanPhoneForLink.startsWith("0") && cleanPhoneForLink.length === 10
-          ? "212" + cleanPhoneForLink.slice(1)
-          : cleanPhoneForLink
-      }`
-    : null;
+  const brandOrSourceLabel =
+    lead.brand === "lv"
+      ? "La Varenne"
+      : lead.brand === "lvt"
+      ? "La Varenne Touch"
+      : lead.source === "facebook"
+      ? "Facebook Ads"
+      : lead.source === "instagram"
+      ? "Instagram Ads"
+      : lead.source || "La Varenne";
 
   return (
     <div className="wa-overlay" onClick={onClose}>
       <div
-        className="wa-modal wa-drawer-enhanced"
+        className="wa-card"
         role="dialog"
         aria-modal="true"
         aria-labelledby="wa-chat-lead-name"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* HEADER DE LA CONVERSATION */}
-        <div className="wa-modal-head wa-chat-head">
-          <div className="wa-avatar-wrap">
-            <div className="wa-avatar">{initialsOf(lead.client)}</div>
-            <span className="wa-online-dot" title="Canal WhatsApp actif" />
-          </div>
-
-          <div className="wa-head-info">
-            <div className="wa-head-title-row">
-              <span id="wa-chat-lead-name" className="who">
-                {lead.client}
-              </span>
-              <span className={`badge ${lead.brand === "lv" ? "brand-lv" : "brand-lvt"}`}>
-                {lead.brand === "lv" ? "La Varenne" : "Touch"}
-              </span>
-              {lead.stage && (
-                <span className="badge badge-stage-pill">
-                  {STAGE_LABELS[lead.stage] || lead.stage}
-                </span>
-              )}
+        {/* ── HEADER ── */}
+        <div className="wa-header">
+          <div className="wa-header-left">
+            <div className="wa-avatar">
+              {initialsOf(lead.client)}
+              <span className="wa-avatar-badge" title="Canal WhatsApp actif" />
             </div>
 
-            <div className="wa-head-sub-row">
-              <span className="sub2 wa-phone-text">
-                {lead.tel || "Numéro non renseigné"}
+            <div className="wa-header-meta">
+              <h3 id="wa-chat-lead-name" className="wa-header-name">
+                {lead.client}
+              </h3>
+
+              <span className="wa-location-pill">
+                <svg viewBox="0 0 24 24" fill="currentColor" width={11} height={11}>
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z" />
+                </svg>
+                {(lead as any).ville || brandOrSourceLabel}
               </span>
 
               {lead.tel && (
-                <div className="wa-head-actions-inline">
-                  <button
-                    type="button"
-                    className="wa-btn-icon"
-                    onClick={handleCopyPhone}
-                    title="Copier le numéro"
-                    aria-label="Copier le numéro"
-                  >
-                    {copied ? (
-                      <span style={{ fontSize: "0.7rem", color: "var(--success)" }}>Copié !</span>
-                    ) : (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                      </svg>
-                    )}
-                  </button>
-
-                  {waExternalUrl && (
-                    <a
-                      href={waExternalUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="wa-btn-icon wa-link-external"
-                      title="Ouvrir dans WhatsApp Web"
-                      aria-label="Ouvrir dans WhatsApp Web"
-                    >
-                      <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2C6.5 2 2 6.3 2 11.6c0 1.8.5 3.5 1.4 5L2 22l5.6-1.4c1.5.8 3.1 1.2 4.4 1.2 5.5 0 10-4.3 10-9.7S17.5 2 12 2Z" />
-                      </svg>
-                    </a>
-                  )}
-                </div>
+                <span className="wa-phone-row">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width={11} height={11}>
+                    <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.5c0-.55-.45-1-.99-1.11z" />
+                  </svg>
+                  {lead.tel}
+                </span>
               )}
             </div>
           </div>
 
-          {/* Boutons de contrôle en haut à droite */}
-          <div className="wa-head-controls">
-            <button
-              type="button"
-              className={`wa-btn-icon ${loadingHistory ? "spinning" : ""}`}
-              onClick={() => fetchMessages(false)}
-              title="Rafraîchir les messages"
-              aria-label="Rafraîchir"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M23 4v6h-6M1 20v-6h6" />
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          <div className="wa-header-actions">
+            <button type="button" className="wa-action-btn" aria-label="Plus d'options" title="Plus d'options">
+              <svg viewBox="0 0 24 24" fill="currentColor" width={16} height={16}>
+                <circle cx="12" cy="5" r="1.5" />
+                <circle cx="12" cy="12" r="1.5" />
+                <circle cx="12" cy="19" r="1.5" />
               </svg>
             </button>
-
-            <button
-              type="button"
-              className="wa-modal-close"
-              onClick={onClose}
-              aria-label="Fermer la conversation"
-              title="Fermer (Échap)"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />
+            <button type="button" className="wa-action-btn" onClick={onClose} aria-label="Fermer la conversation" title="Fermer (Échap)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" width={16} height={16}>
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
               </svg>
             </button>
           </div>
         </div>
 
-        {/* ALERTE D'ERREUR ÉVENTUELLE */}
         {errorNotice && (
-          <div className="wa-alert-banner">
-            <span>⚠️ {errorNotice}</span>
-            <button
-              type="button"
-              className="wa-alert-dismiss"
-              onClick={() => setErrorNotice(null)}
-            >
-              ✕
-            </button>
+          <div className="wa-error-banner">
+            <span>{errorNotice}</span>
+            <button type="button" className="wa-error-dismiss" onClick={() => setErrorNotice(null)}>✕</button>
           </div>
         )}
 
-        {/* THREAD DES MESSAGES */}
-        <div className="wa-thread wa-thread-enhanced">
+        {/* ── CHAT BODY ── */}
+        <div className="wa-body">
           {messages && messages.length > 0 ? (
-            messages.map((m, idx) => {
-              const isMe = m.from === "moi" || m.from_side === "moi" || m.direction === "outbound";
-              const showDate =
-                idx === 0 ||
-                formatMsgDate(messages[idx - 1]?.created_at) !== formatMsgDate(m.created_at);
+            <>
+              {messages.map((m, idx) => {
+                const isMe =
+                  m.from === "moi" ||
+                  m.from_side === "moi" ||
+                  m.direction === "outbound";
+                const showDate =
+                  idx === 0 ||
+                  formatMsgDate(messages[idx - 1]?.created_at) !==
+                    formatMsgDate(m.created_at);
 
-              return (
-                <React.Fragment key={m.id || idx}>
-                  {showDate && m.created_at && (
-                    <div className="wa-date-divider">
-                      <span>{formatMsgDate(m.created_at)}</span>
-                    </div>
-                  )}
+                return (
+                  <React.Fragment key={m.id || idx}>
+                    {showDate && m.created_at && (
+                      <div className="wa-date-sep">
+                        <span>{formatMsgDate(m.created_at)}</span>
+                      </div>
+                    )}
 
-                  <div className={`wa-bubble-wrapper ${isMe ? "moi" : "eux"}`}>
-                    <div className={`wa-bubble ${isMe ? "moi" : "eux"}`}>
-                      <div className="wa-bubble-content">{m.text}</div>
-                      <div className="wa-bubble-meta">
-                        <span className="wa-bubble-time">
-                          {formatMsgTime(m.created_at)}
-                        </span>
-                        {isMe && (
-                          <span className="wa-bubble-status" title={`Statut : ${m.status || "sent"}`}>
-                            {m.status === "read" ? (
-                              <span className="wa-tick read">✓✓</span>
-                            ) : m.status === "delivered" ? (
-                              <span className="wa-tick delivered">✓✓</span>
-                            ) : m.status === "failed" ? (
-                              <span className="wa-tick failed" title="Échec d'envoi">⚠️</span>
-                            ) : (
-                              <span className="wa-tick sent">✓</span>
-                            )}
-                          </span>
-                        )}
+                    <div className={`wa-msg-row ${isMe ? "me" : "them"}`}>
+                      <div className={`wa-bubble ${isMe ? "me" : "them"}`}>
+                        <p style={{ margin: 0 }}>{m.text}</p>
+                        <div className="wa-bubble-meta">
+                          <span>{formatMsgTime(m.created_at)}</span>
+                          {isMe && (
+                            <span title={`Statut : ${m.status || "sent"}`}>
+                              {m.status === "read" ? (
+                                <span className="wa-tick-read">✓✓</span>
+                              ) : m.status === "delivered" ? (
+                                <span className="wa-tick-delivered">✓✓</span>
+                              ) : m.status === "failed" ? (
+                                <span className="wa-tick-failed" title="Échec d'envoi">!</span>
+                              ) : (
+                                <span className="wa-tick-sent">✓</span>
+                              )}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </React.Fragment>
-              );
-            })
+                  </React.Fragment>
+                );
+              })}
+              <div ref={threadEndRef} />
+            </>
           ) : (
-            <div className="wa-empty-conversation">
-              <div className="wa-empty-icon">💬</div>
-              <div className="wa-empty-title">Aucun message pour ce lead</div>
-              <p className="wa-empty-desc">
-                Engagez la discussion WhatsApp avec <strong>{lead.client}</strong> en direct ou utilisez un modèle pré-rempli ci-dessous.
-              </p>
-            </div>
+            <div className="wa-empty" ref={threadEndRef} />
           )}
-          <div ref={threadEndRef} />
         </div>
 
-        {/* TIROIR DE MODÈLES DE RÉPONSE RAPIDE */}
-        {showTemplates && (
-          <div className="wa-templates-panel">
-            <div className="wa-templates-head">
-              <span>⚡ Modèles de réponses rapides</span>
-              <button
-                type="button"
-                className="wa-btn-text"
-                onClick={() => setShowTemplates(false)}
-              >
-                Fermer
-              </button>
-            </div>
-            <div className="wa-templates-list">
-              {TEMPLATES.map((tmpl, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className="wa-template-item"
-                  onClick={() => handleApplyTemplate(tmpl)}
-                >
-                  <span className="wa-tmpl-emoji">{tmpl.emoji}</span>
-                  <div className="wa-tmpl-body">
-                    <span className="wa-tmpl-label">{tmpl.label}</span>
-                    <span className="wa-tmpl-preview">
-                      {tmpl.getText(firstName, lead.brand)}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* ── FOOTER & INPUT BAR ── */}
+        <div className="wa-footer">
+          <form className="wa-input-pill" onSubmit={handleSend}>
+            <button
+              type="button"
+              className="wa-emoji-btn"
+              onClick={() => inputRef.current?.focus()}
+              aria-label="Insérer un emoji"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={20} height={20}>
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                <line x1="9" y1="9" x2="9.01" y2="9" />
+                <line x1="15" y1="9" x2="15.01" y2="9" />
+              </svg>
+            </button>
 
-        {/* BARRE D'OUTILS AU-DESSUS DU COMPOSER */}
-        <div className="wa-quick-bar">
-          <button
-            type="button"
-            className={`wa-quick-btn ${showTemplates ? "active" : ""}`}
-            onClick={() => setShowTemplates((prev) => !prev)}
-          >
-            ⚡ Modèles rapides ({TEMPLATES.length})
-          </button>
-          <div className="wa-quick-chips">
-            {TEMPLATES.slice(0, 3).map((tmpl, i) => (
-              <button
-                key={i}
-                type="button"
-                className="wa-quick-chip"
-                onClick={() => handleApplyTemplate(tmpl)}
-                title={tmpl.label}
-              >
-                {tmpl.emoji} {tmpl.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* FORMULAIRE DE COMPOSITION ET D'ENVOI */}
-        <form className="wa-compose wa-compose-enhanced" onSubmit={handleSend}>
-          <div className="wa-input-container">
-            <textarea
+            <input
               ref={inputRef}
-              rows={1}
-              placeholder={`Écrire un message à ${firstName || "ce prospect"}… (Entrée pour envoyer)`}
+              type="text"
+              placeholder={`Écrire un message à ${lead.client || "ce prospect"}…`}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={handleKeyDown}
               disabled={sending || !lead.tel}
               aria-label="Message WhatsApp"
             />
+
+            <button
+              type="submit"
+              className="wa-btn-send"
+              disabled={sending || !inputText.trim() || !lead.tel}
+              aria-label="Envoyer le message WhatsApp"
+              title="Envoyer (Entrée)"
+            >
+              {sending ? (
+                <span className="wa-spinner" />
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={17} height={17} style={{ transform: "translate(-1px, 1px)" }}>
+                  <path d="m22 2-7 20-4-9-9-4Z" />
+                  <path d="M22 2 11 13" />
+                </svg>
+              )}
+            </button>
+          </form>
+
+          <div className="wa-footer-security">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width={13} height={13}>
+              <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <span>WhatsApp Cloud API · Messages chiffrés &amp; archivés dans le CRM</span>
           </div>
-
-          <button
-            type="submit"
-            className={`wa-send ${sending ? "loading" : ""}`}
-            aria-label="Envoyer le message WhatsApp"
-            title="Envoyer (Entrée)"
-            disabled={sending || !inputText.trim() || !lead.tel}
-          >
-            {sending ? (
-              <span className="wa-spinner" />
-            ) : (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path
-                  d="M4 12 20 4l-6.5 16-3-6.5L4 12Z"
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                />
-              </svg>
-            )}
-          </button>
-        </form>
-
-        {/* NOTE DE PIED DE MODAL */}
-        <div className="wa-footer-info">
-          <span>
-            {process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID || "WhatsApp Cloud API"} · Messages chiffrés & archivés dans le CRM
-          </span>
         </div>
+
       </div>
     </div>
   );
 };
+

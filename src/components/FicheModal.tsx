@@ -211,7 +211,7 @@ export const FicheModal: React.FC<FicheModalProps> = ({
                   checked={interet === "chaud"}
                   onChange={() => setInteret("chaud")}
                 />
-                <span>🔥 Chaud</span>
+                <span>Chaud</span>
               </label>
               <label className="fiche-chip fiche-radio">
                 <input
@@ -221,7 +221,7 @@ export const FicheModal: React.FC<FicheModalProps> = ({
                   checked={interet === "tiede"}
                   onChange={() => setInteret("tiede")}
                 />
-                <span>🌤️ Tiède</span>
+                <span>Tiède</span>
               </label>
               <label className="fiche-chip fiche-radio">
                 <input
@@ -231,7 +231,7 @@ export const FicheModal: React.FC<FicheModalProps> = ({
                   checked={interet === "froid"}
                   onChange={() => setInteret("froid")}
                 />
-                <span>❄️ Froid</span>
+                <span>Froid</span>
               </label>
             </div>
           </div>

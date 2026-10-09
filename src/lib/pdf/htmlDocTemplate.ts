@@ -2,28 +2,63 @@ import fs from "fs";
 import path from "path";
 import { DocumentPdfData } from "./types";
 
+function formatStatus(statut?: string): string {
+  const map: Record<string, string> = {
+    en_attente: "EN ATTENTE",
+    valide: "VALIDÉ",
+    validee: "VALIDÉE",
+    accepte: "ACCEPTÉ",
+    refuse: "REFUSÉ",
+    refusee: "REFUSÉE",
+    annule: "ANNULÉ",
+    annulee: "ANNULÉE",
+    livree: "LIVRÉE",
+    payee: "PAYÉE",
+    brouillon: "BROUILLON",
+  };
+  return map[statut?.toLowerCase() || ""] || (statut || "EN ATTENTE").toUpperCase();
+}
+
+function formatCategory(type?: string): string {
+  if (!type) return "Café de spécialité";
+  if (type === "achat_cafe") return "Café de spécialité";
+  if (type === "equipement_cafe") return "Équipement Pro";
+  if (type === "mixte") return "Mixte";
+  if (type === "autre") return "Autre prestation";
+  return type;
+}
+
+function formatDateLabel(data: DocumentPdfData): string {
+  if (data.date_label) return data.date_label;
+  if (data.created_at) {
+    try {
+      const d = new Date(data.created_at);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString("fr-FR", {
+          day: "numeric",
+          month: "long",
+        });
+      }
+    } catch {
+      // fallback
+    }
+  }
+  return "Aujourd'hui";
+}
+
 export function generateHtmlDocument(data: DocumentPdfData): string {
-  const isLvt = data.brand === "lvt";
   const docTypeLabel = data.type === "devis" ? "DEVIS" : "FACTURE";
-  const brandName = isLvt ? "La Varenne Touch" : "La Varenne";
-  const brandAccent = isLvt ? "#627B55" : "#A67C38";
-  const brandLight = isLvt ? "#F4F7F3" : "#FAF7F2";
-  const brandBorder = isLvt ? "#D3DDD1" : "#E2D8C9";
+  const brandName = data.brand === "lvt" ? "La Varenne Touch" : "La Varenne";
 
   let logoSrc = "/images/LA VARENNE LOGO VR black.png";
   try {
-    const logoFile = isLvt
-      ? "LA VARENNE LOGO VR black.png"
-      : "LA VARENNE LOGO VR gold.png";
-    const fullPath = path.join(process.cwd(), "public", "images", logoFile);
+    const fullPath = path.join(process.cwd(), "public", "images", "LA VARENNE LOGO VR black.png");
     if (fs.existsSync(fullPath)) {
       const b64 = fs.readFileSync(fullPath).toString("base64");
       logoSrc = `data:image/png;base64,${b64}`;
     }
   } catch {
-    logoSrc = isLvt
-      ? "/images/LA VARENNE LOGO VR black.png"
-      : "/images/LA VARENNE LOGO VR gold.png";
+    logoSrc = "/images/LA VARENNE LOGO VR black.png";
   }
 
   const formatMoney = (amount: number) =>
@@ -51,35 +86,34 @@ export function generateHtmlDocument(data: DocumentPdfData): string {
           },
         ];
 
+  const dateIssued = formatDateLabel(data);
+  const statusLabel = formatStatus(data.statut);
+
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
   <title>${docTypeLabel} ${data.id} — ${brandName}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
     @page {
-      size: A4;
-      margin: 15mm 15mm 15mm 15mm;
+      size: A4 portrait;
+      margin: 12mm 14mm 12mm 14mm;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: 'Inter', -apple-system, sans-serif;
-      color: #1C1917;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #111827;
       background: #FFFFFF;
-      font-size: 13px;
+      font-size: 12px;
       line-height: 1.45;
-      padding: 30px;
+      padding: 34px 38px;
       max-width: 860px;
       margin: 0 auto;
-    }
-
-    .top-accent {
-      height: 6px;
-      background: ${brandAccent};
-      margin: -30px -30px 24px -30px;
+      -webkit-font-smoothing: antialiased;
     }
 
     .header {
@@ -87,216 +121,333 @@ export function generateHtmlDocument(data: DocumentPdfData): string {
       justify-content: space-between;
       align-items: flex-start;
       margin-bottom: 24px;
-      padding-bottom: 20px;
-      border-bottom: 1.5px solid ${brandBorder};
     }
 
-    .brand-title {
-      font-family: 'Fraunces', serif;
-      font-size: 24px;
-      font-weight: 700;
-      color: #161310;
-      letter-spacing: -0.5px;
+    .header-left {
+      max-width: 440px;
     }
 
-    .company-sub {
-      color: ${brandAccent};
-      font-weight: 600;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-top: 2px;
+    .logo-img {
+      height: 38px;
+      width: auto;
+      max-width: 220px;
+      object-fit: contain;
+      display: block;
     }
 
-    .company-desc {
-      color: #6B655B;
-      font-size: 11.5px;
-      margin-top: 4px;
+    .company-details {
+      margin-top: 14px;
     }
 
-    .company-fisc {
-      color: #8C806B;
-      font-size: 10.5px;
-      margin-top: 6px;
-    }
-
-    .doc-meta {
-      background: ${brandLight};
-      border: 1px solid ${brandBorder};
-      border-radius: 8px;
-      padding: 14px 18px;
-      text-align: right;
-      min-width: 220px;
-    }
-
-    .doc-type {
-      font-family: 'Fraunces', serif;
-      font-size: 18px;
-      font-weight: 700;
-      color: #161310;
-    }
-
-    .doc-ref {
+    .company-name {
+      font-weight: 800;
       font-size: 13px;
-      font-weight: 700;
-      color: ${brandAccent};
+      color: #000000;
+      letter-spacing: -0.2px;
+    }
+
+    .company-tagline {
+      color: #6B7280;
+      font-size: 11px;
       margin-top: 2px;
     }
 
-    .doc-dates {
-      font-size: 11px;
-      color: #6B655B;
-      margin-top: 6px;
-    }
-
-    .cards-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 18px;
-      margin-bottom: 24px;
-    }
-
-    .card {
-      background: ${brandLight};
-      border: 1px solid ${brandBorder};
-      border-radius: 8px;
-      padding: 14px 16px;
-    }
-
-    .card-label {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: ${brandAccent};
-      margin-bottom: 6px;
-    }
-
-    .card-title {
-      font-size: 15px;
-      font-weight: 700;
-      color: #161310;
-      margin-bottom: 4px;
-    }
-
-    .card-line {
+    .company-meta-line {
+      color: #374151;
       font-size: 11.5px;
-      color: #4A443C;
       margin-top: 3px;
     }
 
+    .company-fisc {
+      color: #9CA3AF;
+      font-size: 10px;
+      margin-top: 5px;
+      letter-spacing: 0.02em;
+    }
+
+    .header-right {
+      text-align: right;
+      min-width: 230px;
+    }
+
+    .doc-main-title {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: #000000;
+      text-align: right;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .doc-meta-info {
+      font-size: 11.5px;
+      color: #4B5563;
+      line-height: 1.55;
+      text-align: right;
+    }
+
+    .status-card {
+      margin-top: 14px;
+      margin-left: auto;
+      width: 195px;
+      background: #F9FAFB;
+      border: 1px solid #E5E7EB;
+      border-radius: 6px;
+      padding: 8px 14px;
+      text-align: left;
+    }
+
+    .status-card-label {
+      font-size: 9.5px;
+      font-weight: 700;
+      color: #6B7280;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .status-card-value {
+      font-size: 13px;
+      font-weight: 800;
+      color: #111827;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    /* Cards Grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid #E5E7EB;
+      border-radius: 6px;
+      background: #F9FAFB;
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+
+    .card-left {
+      padding: 16px 20px;
+      border-right: 1px solid #E5E7EB;
+    }
+
+    .card-right {
+      padding: 16px 20px;
+    }
+
+    .card-head-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: #6B7280;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .card-client-name {
+      font-size: 15px;
+      font-weight: 800;
+      color: #000000;
+      margin-top: 2px;
+    }
+
+    .card-info-line {
+      font-size: 11.5px;
+      color: #374151;
+      line-height: 1.55;
+      margin-top: 3px;
+    }
+
+    /* Section Titles */
+    .section-title {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #111827;
+      margin-bottom: 8px;
+    }
+
+    /* Items Table */
     table.items-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 20px;
-    }
-
-    table.items-table th {
-      background: #2A231C;
-      color: #FFFFFF;
-      font-size: 11px;
-      font-weight: 600;
-      text-align: left;
-      padding: 10px 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-    }
-
-    table.items-table td {
-      padding: 10px 12px;
-      font-size: 12px;
-      border-bottom: 1px solid ${brandBorder};
-    }
-
-    table.items-table tr:nth-child(even) {
-      background: ${brandLight};
-    }
-
-    .align-r { text-align: right; }
-
-    .bottom-row {
-      display: grid;
-      grid-template-columns: 1fr 280px;
-      gap: 20px;
       margin-bottom: 24px;
-    }
-
-    .bank-box {
-      background: ${brandLight};
-      border: 1px solid ${brandBorder};
-      border-radius: 8px;
-      padding: 14px 16px;
-      font-size: 11.5px;
-    }
-
-    .totals-box {
-      background: ${brandLight};
-      border: 1px solid ${brandBorder};
-      border-radius: 8px;
+      border: 1px solid #E5E7EB;
+      border-radius: 4px;
       overflow: hidden;
+    }
+
+    table.items-table thead th {
+      background: #000000;
+      color: #FFFFFF;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 10px 12px;
+    }
+
+    table.items-table tbody td {
+      padding: 10px 12px;
+      font-size: 11.5px;
+      border-bottom: 1px solid #E5E7EB;
+      vertical-align: middle;
+      background: #FFFFFF;
+    }
+
+    table.items-table tbody tr:nth-child(even) td {
+      background: #FAFAFA;
+    }
+
+    table.items-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* Settlement & Totals Grid */
+    .settlement-totals-grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 24px;
+      align-items: start;
+      margin-bottom: 26px;
+    }
+
+    .settlement-block {
+      font-size: 11.5px;
+      color: #374151;
+      line-height: 1.6;
+    }
+
+    .settlement-line {
+      margin-top: 2px;
+    }
+
+    .totals-block {
+      border: 1px solid #E5E7EB;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #FAFAFA;
     }
 
     .totals-row {
       display: flex;
       justify-content: space-between;
-      padding: 8px 14px;
-      font-size: 12px;
-      color: #4A443C;
+      align-items: center;
+      padding: 9px 14px;
+      border-bottom: 1px solid #E5E7EB;
     }
 
-    .totals-banner {
-      background: ${brandAccent};
+    .totals-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .totals-val {
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #000000;
+    }
+
+    .totals-box-ttc {
+      background: #000000;
       color: #FFFFFF;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 12px 14px;
-      font-weight: 700;
-      font-size: 14px;
-    }
-
-    .conditions-box {
-      border: 1px solid ${brandBorder};
-      border-radius: 8px;
       padding: 14px 16px;
-      font-size: 11px;
-      color: #6B655B;
-      margin-bottom: 24px;
     }
 
-    .signature-grid {
+    .ttc-label {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .ttc-val {
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: -0.01em;
+      text-align: right;
+      line-height: 1.1;
+    }
+
+    /* Terms & Signature */
+    .terms-section {
+      margin-bottom: 26px;
+    }
+
+    .terms-disclaimer {
+      font-size: 11px;
+      color: #4B5563;
+      line-height: 1.5;
+      margin-top: 4px;
+      margin-bottom: 12px;
+    }
+
+    .signature-boxes-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px dashed ${brandBorder};
+      border: 1px solid #E5E7EB;
+      border-radius: 4px;
+      overflow: hidden;
     }
 
-    .footer {
-      border-top: 1px solid ${brandBorder};
-      padding-top: 14px;
+    .sig-box:first-child {
+      border-right: 1px solid #E5E7EB;
+    }
+
+    .sig-box-head {
+      background: #F9FAFB;
+      padding: 8px 14px;
+      border-bottom: 1px solid #E5E7EB;
+    }
+
+    .sig-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: #111827;
+      text-transform: uppercase;
+    }
+
+    .sig-sub {
+      font-size: 9.5px;
+      color: #6B7280;
+      margin-top: 2px;
+    }
+
+    .sig-box-body {
+      height: 72px;
+      background: #FFFFFF;
+    }
+
+    /* Footer */
+    .legal-footer {
       text-align: center;
-      font-size: 10px;
-      color: #8C806B;
+      font-size: 9.5px;
+      color: #6B7280;
       line-height: 1.6;
+      margin-top: 18px;
     }
 
     @media print {
       body {
-        padding: 0;
+        padding: 0 !important;
+        margin: 0 !important;
         background: #FFFFFF !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
-      .top-accent { margin: 0 0 20px 0 !important; }
       .no-print { display: none !important; }
       @page {
         size: A4 portrait;
-        margin: 10mm 12mm 10mm 12mm;
+        margin: 12mm 14mm 12mm 14mm;
       }
     }
   </style>
   <script>
-    // Ne se déclenche que si le document est ouvert directement dans un onglet autonome (pas dans l'iframe d'impression du CRM)
     if (window.self === window.top) {
       window.addEventListener('load', function() {
         window.focus();
@@ -308,154 +459,137 @@ export function generateHtmlDocument(data: DocumentPdfData): string {
   </script>
 </head>
 <body>
-  <div class="top-accent"></div>
-
+  <!-- Header -->
   <div class="header">
-    <div style="display: flex; align-items: center; gap: 16px;">
-      <img src="${logoSrc}" alt="${brandName}" style="height: 52px; width: auto; max-width: 140px; object-fit: contain; display: block;" />
-      <div>
-        <div class="brand-title">${brandName.toUpperCase()}</div>
-        <div class="company-sub">Alea Food S.A.R.L.</div>
-        <div class="company-desc">Torréfaction Artisanale & Distributeur de Café d'Excellence</div>
-        <div class="company-fisc">
-          Casablanca, Maroc | Tél: +212 5 22 44 12 00 | contact@aleafood.ma<br>
-          ICE: 002345678000045 — IF: 45678901 — RC: 123456
-        </div>
+    <div class="header-left">
+      <img src="${logoSrc}" alt="${brandName}" class="logo-img" />
+      <div class="company-details">
+        <div class="company-name">ALEA FOOD S.A.R.L.</div>
+        <div class="company-tagline">Torréfaction artisanale & distributeur de café d’excellence</div>
+        <div class="company-meta-line">Casablanca, Maroc · +212 5 22 44 12 00</div>
+        <div class="company-meta-line">contact@aleafood.ma</div>
+        <div class="company-fisc">ICE : 002345678000045 · IF : 45678901 · RC Casablanca : 123456</div>
       </div>
     </div>
-    <div class="doc-meta">
-      <div class="doc-type">${docTypeLabel}</div>
-      <div class="doc-ref">N° ${data.id}</div>
-      <div class="doc-dates">
-        Date d'émission : <strong>${data.date_label || "Aujourd'hui"}</strong><br>
-        ${
-          data.type === "facture"
-            ? `Échéance : <strong>${data.echeance || "+30 jours"}</strong>`
-            : "Validité de l'offre : <strong>30 jours</strong>"
-        }
+    <div class="header-right">
+      <div class="doc-main-title">${docTypeLabel}</div>
+      <div class="doc-meta-info">
+        <div>RÉFÉRENCE <strong style="color: #111827;">${data.id}</strong></div>
+        <div>Émis le : <strong>${dateIssued}</strong></div>
+        <div>${data.type === "facture" ? `Échéance : <strong>${data.echeance || "+30 jours"}</strong>` : "Validité : <strong>30 jours</strong>"}</div>
+      </div>
+      <div class="status-card">
+        <div class="status-card-label">STATUT DU DOSSIER</div>
+        <div class="status-card-value">${statusLabel}</div>
       </div>
     </div>
   </div>
 
-  <div class="cards-row">
-    <div class="card">
-      <div class="card-label">Destinataire / Client</div>
-      <div class="card-title">${data.client}</div>
-      ${
-        data.client_details?.contact
-          ? `<div class="card-line">Contact : ${data.client_details.contact}</div>`
-          : ""
-      }
-      ${
-        data.client_details?.ville
-          ? `<div class="card-line">Ville : ${data.client_details.ville} ${
-              data.client_details.secteur ? `(${data.client_details.secteur})` : ""
-            }</div>`
-          : ""
-      }
-      ${
-        data.client_details?.tel
-          ? `<div class="card-line">Tél : ${data.client_details.tel}</div>`
-          : ""
-      }
+  <!-- Information Cards -->
+  <div class="cards-grid">
+    <div class="card-left">
+      <div class="card-head-title">DESTINATAIRE / FACTURÉ À</div>
+      <div class="card-client-name">${data.client}</div>
+      ${data.client_details?.contact ? `<div class="card-info-line">Contact : ${data.client_details.contact}</div>` : ""}
+      ${data.client_details?.ville ? `<div class="card-info-line">Ville : ${data.client_details.ville}${data.client_details.secteur ? ` (${data.client_details.secteur})` : ""}</div>` : ""}
+      ${data.client_details?.tel ? `<div class="card-info-line">Tél : ${data.client_details.tel}</div>` : ""}
     </div>
-    <div class="card">
-      <div class="card-label">Dossier Commercial</div>
-      <div class="card-title">${data.commercial || "Commercial Alea Food"}</div>
-      <div class="card-line">Marque : ${brandName}</div>
-      ${
-        data.commande_id
-          ? `<div class="card-line">Commande liée : ${data.commande_id}</div>`
-          : ""
-      }
-      ${
-        data.devis_id
-          ? `<div class="card-line">Devis d'origine : ${data.devis_id}</div>`
-          : ""
-      }
-      <div class="card-line">Statut : <strong>${(data.statut || "").toUpperCase()}</strong></div>
+    <div class="card-right">
+      <div class="card-head-title">INFORMATIONS COMMERCIALES</div>
+      <div class="card-info-line" style="margin-top: 6px;">
+        Conseiller commercial : <strong style="color: #111827;">${data.commercial || "Sara Idrissi"}</strong>
+      </div>
+      <div class="card-info-line">
+        Gamme & univers : <strong style="color: #111827;">${brandName}</strong>
+      </div>
+      <div class="card-info-line">
+        Paiement : <strong style="color: #111827;">Virement bancaire / Chèque</strong>
+      </div>
     </div>
   </div>
 
+  <!-- Items Table -->
+  <div class="section-title">${docTypeLabel === "DEVIS" ? "DÉTAIL DU DEVIS" : "DÉTAIL DE LA FACTURE"}</div>
   <table class="items-table">
     <thead>
       <tr>
-        <th style="width: 30px;">#</th>
-        <th>Désignation</th>
-        <th>Catégorie</th>
-        <th class="align-r" style="width: 50px;">Qté</th>
-        <th class="align-r" style="width: 100px;">P.U. HT</th>
-        <th class="align-r" style="width: 110px;">Total HT</th>
+        <th style="width: 38px; text-align: left;">#</th>
+        <th style="text-align: left;">DÉSIGNATION DU PRODUIT / PRESTATION</th>
+        <th style="text-align: left;">CATÉGORIE</th>
+        <th style="width: 50px; text-align: center;">QTÉ</th>
+        <th style="width: 105px; text-align: right;">P.U. HT</th>
+        <th style="width: 115px; text-align: right;">TOTAL HT</th>
       </tr>
     </thead>
     <tbody>
-      ${items
-        .map(
-          (it, idx) => `
+      ${items.map((it, idx) => `
         <tr>
-          <td>${idx + 1}</td>
-          <td><strong>${it.product_name}</strong></td>
-          <td>${it.product_type || "Café de spécialité"}</td>
-          <td class="align-r">${it.quantity || 1}</td>
-          <td class="align-r">${formatMoney(it.unit_price)}</td>
-          <td class="align-r"><strong>${formatMoney(it.total_amount)}</strong></td>
+          <td style="color: #6B7280; font-weight: 500;">${String(idx + 1).padStart(2, "0")}</td>
+          <td><strong style="color: #111827;">${it.product_name}</strong></td>
+          <td style="color: #4B5563;">${formatCategory(it.product_type)}</td>
+          <td style="text-align: center; color: #111827; font-weight: 500;">${it.quantity || 1}</td>
+          <td style="text-align: right; color: #111827;">${formatMoney(it.unit_price)}</td>
+          <td style="text-align: right;"><strong style="color: #000000;">${formatMoney(it.total_amount)}</strong></td>
         </tr>
-      `
-        )
-        .join("")}
+      `).join("")}
     </tbody>
   </table>
 
-  <div class="bottom-row">
-    <div class="bank-box">
-      <div class="card-label">Coordonnées bancaires pour règlement</div>
-      <div>Banque : <strong>Attijariwafa Bank</strong> — Agence Casablanca Racine</div>
-      <div>Bénéficiaire : <strong>ALEA FOOD S.A.R.L.</strong></div>
-      <div>RIB : <strong style="color: ${brandAccent};">007 780 0001234567890123 45</strong></div>
-      <div style="margin-top: 6px; font-size: 10.5px; color: #6B655B;">
-        Merci d'indiquer la référence <strong>${data.id}</strong> sur l'ordre de virement.
-      </div>
+  <!-- Settlement & Totals Block -->
+  <div class="settlement-totals-grid">
+    <div class="settlement-block">
+      <div class="section-title" style="margin-bottom: 8px;">COORDONNÉES BANCAIRES POUR RÈGLEMENT</div>
+      <div class="settlement-line">Banque : <strong style="color: #111827;">Attijariwafa Bank – Agence Casa Racine</strong></div>
+      <div class="settlement-line">Bénéficiaire : <strong style="color: #111827;">ALEA FOOD S.A.R.L.</strong></div>
+      <div class="settlement-line">RIB : <strong style="color: #000000; font-family: monospace, sans-serif; letter-spacing: 0.03em;">007 780 0001234567890123 45</strong></div>
+      <div style="margin-top: 5px; font-size: 10.5px; color: #6B7280;">Indication du virement : « ${data.id} - ${data.client} »</div>
     </div>
 
-    <div class="totals-box">
+    <div class="totals-block">
       <div class="totals-row">
-        <span>Total Brut HT</span>
-        <span>${formatMoney(totalHt)}</span>
+        <span class="totals-label">Total brut HT</span>
+        <span class="totals-val">${formatMoney(totalHt)}</span>
       </div>
       <div class="totals-row">
-        <span>TVA (20,00 %)</span>
-        <span>${formatMoney(tva)}</span>
+        <span class="totals-label">TVA (20,00 %)</span>
+        <span class="totals-val">${formatMoney(tva)}</span>
       </div>
-      <div class="totals-banner">
-        <span>TOTAL NET TTC</span>
-        <span>${formatMoney(totalTtc)}</span>
+      <div class="totals-box-ttc">
+        <span class="ttc-label">TOTAL NET TTC</span>
+        <span class="ttc-val">${formatMoney(totalTtc)}</span>
       </div>
     </div>
   </div>
 
-  <div class="conditions-box">
-    <strong>CONDITIONS DE VENTE & MENTIONS LÉGALES</strong>
-    <p style="margin-top: 4px;">
-      ${
-        data.type === "devis"
-          ? "Offre valable 30 jours à compter de la date d'émission. Pour validation définitive, merci de nous retourner le présent devis revêtu de la mention manuscrite « Bon pour accord » ainsi que du cachet et signature de l'acheteur."
-          : "Paiement par virement bancaire ou chèque à l'ordre d'Alea Food S.A.R.L. à échéance. Tout retard de paiement donnera lieu de plein droit à une pénalité légale ainsi qu'à une indemnité forfaitaire pour frais de recouvrement."
-      }
-    </p>
-    ${
-      data.type === "devis"
-        ? `
-      <div class="signature-grid">
-        <div>Pour Alea Food (Cachet & Signature) :</div>
-        <div>Pour le Client (« Bon pour accord », Date & Signature) :</div>
+  <!-- Signature & Terms -->
+  <div class="terms-section">
+    <div class="section-title">CONDITIONS & BON POUR ACCORD</div>
+    <div class="terms-disclaimer">
+      ${data.type === "devis"
+        ? "Devis valable 30 jours. Pour valider votre commande, merci de retourner ce devis signé et revêtu de la mention manuscrite « Bon pour accord »."
+        : "Paiement par virement bancaire ou chèque à l'ordre d'ALEA FOOD S.A.R.L. à l'échéance convenue."}
+    </div>
+    <div class="signature-boxes-grid">
+      <div class="sig-box">
+        <div class="sig-box-head">
+          <div class="sig-title">POUR ALEA FOOD</div>
+          <div class="sig-sub">Cachet & signature</div>
+        </div>
+        <div class="sig-box-body"></div>
       </div>
-    `
-        : ""
-    }
+      <div class="sig-box">
+        <div class="sig-box-head">
+          <div class="sig-title">POUR LE CLIENT</div>
+          <div class="sig-sub">Mention « Bon pour accord », date & signature</div>
+        </div>
+        <div class="sig-box-body"></div>
+      </div>
+    </div>
   </div>
 
-  <div class="footer">
-    Alea Food S.A.R.L. — Société au capital de 1 000 000 DH — 42 Boulevard d'Anfa, 20000 Casablanca, Maroc<br>
+  <!-- Legal Footer -->
+  <div class="legal-footer">
+    ALEA FOOD S.A.R.L. · Siège social : 42 Boulevard d’Anfa, Casablanca, Maroc · Capital : 1 000 000 DH<br>
     RC Casablanca : 123456 | Patente : 34567890 | IF : 45678901 | ICE : 002345678000045 | CNSS : 8923412
   </div>
 </body>

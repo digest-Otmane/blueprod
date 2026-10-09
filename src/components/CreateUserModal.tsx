@@ -86,17 +86,18 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                   width: "28px",
                   height: "28px",
                   borderRadius: "8px",
-                  background: "var(--surface-alt)",
-                  border: "1px solid var(--border)",
+                  background: "#2A2A2D",
+                  border: "1px solid rgba(255,255,255,0.08)",
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "var(--gold)",
-                  fontSize: "13px",
-                  fontWeight: "bold",
+                  color: "#FFFFFF",
                 }}
               >
-                +
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
               </span>
               Créer un nouvel utilisateur
             </div>
@@ -171,12 +172,14 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                 style={{
                   background: "transparent",
                   border: "none",
-                  color: "var(--gold)",
+                  color: "#D4D4D8",
                   fontSize: "0.75rem",
                   cursor: "pointer",
                   padding: 0,
                   textDecoration: "underline",
                 }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#FFFFFF")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#D4D4D8")}
               >
                 Générer un mot de passe
               </button>
@@ -200,7 +203,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                   border: "none",
                   padding: "4px",
                   cursor: "pointer",
-                  color: showPassword ? "var(--gold)" : "var(--text-muted)",
+                  color: showPassword ? "#FFFFFF" : "var(--text-muted)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",

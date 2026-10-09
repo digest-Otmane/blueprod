@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { CommercialUser } from "@/types/crm";
-import { printDocumentDirectly } from "@/lib/printHelper";
+import { DocumentPreviewModal } from "./DocumentPreviewModal";
 
 interface EditModalProps {
   target: { type: string; id: string; item: any } | null;
@@ -21,6 +21,7 @@ export const EditModal: React.FC<EditModalProps> = ({
 }) => {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
+  const [showDocPreview, setShowDocPreview] = useState(false);
 
   // Marque active de l'élément en cours de modification
   const activeBrand =
@@ -386,14 +387,14 @@ export const EditModal: React.FC<EditModalProps> = ({
                     style={{
                       padding: "8px 12px",
                       borderRadius: "6px",
-                      background: "rgba(245, 158, 11, 0.12)",
-                      border: "1px solid rgba(245, 158, 11, 0.3)",
-                      color: "var(--warning)",
+                      background: "rgba(255, 255, 255, 0.04)",
+                      border: "1px solid rgba(255, 255, 255, 0.12)",
+                      color: "#D4D4D8",
                       fontSize: "0.82rem",
                       marginBottom: 12,
                     }}
                   >
-                    ⚠️ Ce devis est au statut &laquo; {currentStatut} &raquo;. Seuls les devis en brouillon permettent de modifier les montants et le client.
+                    Ce devis est au statut &laquo; {currentStatut} &raquo;. Seuls les devis en brouillon permettent de modifier les montants et le client.
                   </div>
                 )}
                 {isAccepte && (
@@ -520,20 +521,17 @@ export const EditModal: React.FC<EditModalProps> = ({
           {(type === "devis" || type === "facture") && (
             <button
               type="button"
-              className="btn-ghost"
+              className="btn-secondary"
               style={{
                 marginRight: "auto",
                 display: "inline-flex",
                 alignItems: "center",
-                gap: "6px",
-                color: "var(--accent-strong, var(--accent))",
+                gap: "8px",
+                padding: "8px 14px",
+                fontSize: "0.85rem",
               }}
-              onClick={() =>
-                printDocumentDirectly(
-                  `/api/${type === "devis" ? "devis" : "factures"}/${id}/pdf`
-                )
-              }
-              title="Imprimer / Enregistrer en PDF"
+              onClick={() => setShowDocPreview(true)}
+              title="Aperçu & Impression PDF"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -542,7 +540,7 @@ export const EditModal: React.FC<EditModalProps> = ({
                 <line x1="16" y1="17" x2="8" y2="17" />
                 <polyline points="10 9 9 9 8 9" />
               </svg>
-              Imprimer / PDF
+              Aperçu / PDF
             </button>
           )}
           <button type="button" className="btn-ghost" onClick={onClose} disabled={loading}>
@@ -553,6 +551,16 @@ export const EditModal: React.FC<EditModalProps> = ({
           </button>
         </div>
       </form>
+
+      {/* Interactive Document Preview Modal */}
+      {showDocPreview && (type === "devis" || type === "facture") && (
+        <DocumentPreviewModal
+          type={type as "devis" | "facture"}
+          id={id}
+          onClose={() => setShowDocPreview(false)}
+        />
+      )}
     </div>
   );
 };
+

@@ -56,16 +56,17 @@ export const Topbar: React.FC<TopbarProps> = ({
             justifyContent: "space-between",
             gap: "12px",
             flexWrap: "wrap",
-            background: "color-mix(in srgb, var(--gold) 14%, transparent)",
-            border: "1px solid color-mix(in srgb, var(--gold) 40%, transparent)",
+            background: "rgba(255, 255, 255, 0.04)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
             borderRadius: "10px",
             padding: "10px 16px",
             margin: "16px 32px 0",
             fontSize: "0.85rem",
+            color: "#E4E4E7",
           }}
         >
           <span>
-            Vous visualisez l&apos;espace de <strong>{user.name}</strong> — accès identique au sien, en lecture.
+            Vous visualisez l&apos;espace de <strong style={{ color: "#FFFFFF" }}>{user.name}</strong> — accès identique au sien, en lecture.
           </span>
           <button
             type="button"
@@ -102,21 +103,21 @@ export const Topbar: React.FC<TopbarProps> = ({
 
         <div className="topbar-right">
           {isAdmin ? (
-            <div className="segmented">
+            <div className="topbar-brand-capsule">
               <button
                 type="button"
-                className={currentBrand === "lv" ? "active" : ""}
+                className={`topbar-brand-btn ${currentBrand === "lv" ? "active" : ""}`}
                 onClick={() => onBrandChange("lv")}
               >
-                <span className="swatch" style={{ background: "var(--accent)" }} />
+                <span className="brand-dot" style={{ backgroundColor: "#7DD3FC" }} />
                 La Varenne
               </button>
               <button
                 type="button"
-                className={currentBrand === "lvt" ? "active" : ""}
+                className={`topbar-brand-btn ${currentBrand === "lvt" ? "active" : ""}`}
                 onClick={() => onBrandChange("lvt")}
               >
-                <span className="swatch" style={{ background: "var(--accent-touch)" }} />
+                <span className="brand-dot" style={{ backgroundColor: "#C084FC" }} />
                 La Varenne Touch
               </button>
             </div>
@@ -126,8 +127,8 @@ export const Topbar: React.FC<TopbarProps> = ({
               style={{
                 fontSize: "0.8rem",
                 padding: "7px 13px",
-                background: "color-mix(in srgb, var(--gold) 20%, transparent)",
-                color: "var(--gold)",
+                background: "rgba(255, 255, 255, 0.08)",
+                color: "#FFFFFF",
               }}
             >
               Centre d&apos;appel — La Varenne &amp; Touch

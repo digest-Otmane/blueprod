@@ -113,6 +113,10 @@ export function escapePdfWinAnsi(str: string): string {
       case "‘":
         out += "'";
         break;
+      case "“":
+      case "”":
+        out += "\\\"";
+        break;
       case "«":
         out += "\\253";
         break;
@@ -127,10 +131,17 @@ export function escapePdfWinAnsi(str: string): string {
         out += "\\200";
         break;
       case "œ":
-        out += "oe";
+        out += "\\234";
         break;
       case "Œ":
-        out += "OE";
+        out += "\\214";
+        break;
+      case "…":
+        out += "...";
+        break;
+      case "\u00A0":
+      case "\u202F":
+        out += " ";
         break;
       default:
         if (code >= 32 && code <= 126) {
@@ -410,10 +421,10 @@ export class PdfDoc {
     // xref table
     const xrefOffset = currentOffset;
     let xref = `xref\n0 ${objects.length + 1}\n`;
-    xref += "0000000000 65535 f \r\n";
+    xref += "0000000000 65535 f \n";
     for (let i = 0; i < offsets.length; i++) {
       const offStr = offsets[i].toString().padStart(10, "0");
-      xref += `${offStr} 00000 n \r\n`;
+      xref += `${offStr} 00000 n \n`;
     }
 
     // Trailer

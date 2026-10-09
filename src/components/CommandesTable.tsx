@@ -50,7 +50,7 @@ export const CommandesTable: React.FC<CommandesTableProps> = ({
 
   return (
     <div className="page active">
-      <div className="toolbar">
+      <div className="toolbar" style={{ marginBottom: "20px" }}>
         <div className="search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8" />
@@ -63,8 +63,8 @@ export const CommandesTable: React.FC<CommandesTableProps> = ({
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <button type="button" className="btn" onClick={onCreateNew}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <button type="button" className="btn-create-white" onClick={onCreateNew}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 14, height: 14 }}>
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
@@ -77,12 +77,12 @@ export const CommandesTable: React.FC<CommandesTableProps> = ({
           <thead>
             <tr>
               <th>N°</th>
-              <th>Client</th>
-              <th>Marque</th>
-              <th>Produits</th>
-              <th>Statut</th>
-              <th className="align-r">Montant</th>
-              {isAdmin && <th className="align-r">Actions</th>}
+              <th>CLIENT</th>
+              <th>MARQUE</th>
+              <th>PRODUITS</th>
+              <th>STATUT</th>
+              <th className="align-r">MONTANT</th>
+              {isAdmin && <th className="align-r">ACTIONS</th>}
             </tr>
           </thead>
           <tbody>
@@ -93,7 +93,7 @@ export const CommandesTable: React.FC<CommandesTableProps> = ({
                   <tr key={c.id}>
                     <td className="cell-main">{c.id}</td>
                     <td>
-                      {c.client}
+                      <div className="cell-main">{c.client}</div>
                       {c.date_label && <div className="cell-sub">{c.date_label}</div>}
                     </td>
                     <td>{brandBadge(c.brand)}</td>
@@ -104,22 +104,44 @@ export const CommandesTable: React.FC<CommandesTableProps> = ({
                     <td className="align-r amount">{formatMoney(c.montant)}</td>
                     {isAdmin && (
                       <td className="align-r">
-                        <div className="row-actions">
+                        <div className="row-actions" style={{ display: "inline-flex", gap: "8px", justifyContent: "flex-end" }}>
                           <button
                             type="button"
-                            className="icon-btn"
+                            className="action-btn-pill"
                             title="Modifier"
                             onClick={() => onEdit("commande", c.id)}
                           >
-                            ✎
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              style={{ width: 14, height: 14 }}
+                            >
+                              <path d="M12 20h9" />
+                              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                            </svg>
                           </button>
                           <button
                             type="button"
-                            className="icon-btn danger"
+                            className="action-btn-pill"
                             title="Supprimer"
                             onClick={() => onDelete("commande", c.id)}
                           >
-                            🗑
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              style={{ width: 14, height: 14 }}
+                            >
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            </svg>
                           </button>
                         </div>
                       </td>

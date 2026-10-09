@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { User, Lead, LeadStage, CommercialUser, Brand } from "@/types/crm";
 
 interface KanbanBoardProps {
@@ -45,14 +45,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onSimulateMeta,
   onCreateLead,
 }) => {
-  const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
-  const [dragOverStage, setDragOverStage] = useState<string | null>(null);
-  const [commercialFilter, setCommercialFilter] = useState("tous");
-  const [openMenuLeadId, setOpenMenuLeadId] = useState<string | null>(null);
-
-  const kanbanContainerRef = useRef<HTMLDivElement>(null);
-  const columnRefs = useRef<Record<string, HTMLDivElement | null>>({});
-
   const isAdmin = user.role === "admin";
   const isCentreAppel = user.role === "centre_appel";
   const isCommercial = user.role === "commercial";
@@ -65,6 +57,30 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     return STAGES;
   }, [isCommercial]);
 
+  const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+  const [commercialFilter, setCommercialFilter] = useState("tous");
+  const [openMenuLeadId, setOpenMenuLeadId] = useState<string | null>(null);
+
+  const [selectedMobileStage, setSelectedMobileStage] = useState<LeadStage>("a_qualifier");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(typeof window !== "undefined" && window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  const stagesToRender = useMemo(() => {
+    if (isMobile) {
+      return visibleStages.filter((s) => s.key === selectedMobileStage);
+    }
+    return visibleStages;
+  }, [isMobile, visibleStages, selectedMobileStage]);
+
   // 1. Filtrage dynamique des commerciaux en fonction de la marque sélectionnée
   const filteredCommerciaux = useMemo(() => {
     if (currentBrand && currentBrand !== "all") {
@@ -72,6 +88,141 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     }
     return commerciaux;
   }, [commerciaux, currentBrand]);
+
+  const filteredLeads = useMemo(() => {
+    return leads.filter((l) => {
+      if (isCommercial && l.stage === "a_qualifier") {
+        return false;
+      }
+      if (isAdmin && commercialFilter !== "tous") {
+        return l.commercial === commercialFilter;
+      }
+      return true;
+    });
+  }, [leads, isCommercial, isAdmin, commercialFilter]);
+
+  const kanbanContainerRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const columnRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const [scrollProgress, setScrollProgress] = useState({ widthPct: 25, leftPct: 0 });
+  const [isDraggingTrack, setIsDraggingTrack] = useState(false);
+
+  const updateScrollProgress = useCallback(() => {
+    const el = kanbanContainerRef.current;
+    if (!el) return;
+    const { clientWidth, scrollWidth, scrollLeft } = el;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 0) {
+      setScrollProgress({ widthPct: 100, leftPct: 0 });
+      return;
+    }
+    const thumbWidthPercent = Math.max(15, Math.min(100, (clientWidth / scrollWidth) * 100));
+    const thumbLeftPercent = Math.max(
+      0,
+      Math.min(100 - thumbWidthPercent, (scrollLeft / maxScroll) * (100 - thumbWidthPercent))
+    );
+    setScrollProgress({ widthPct: thumbWidthPercent, leftPct: thumbLeftPercent });
+  }, []);
+
+  useEffect(() => {
+    if (isMobile) return;
+    const el = kanbanContainerRef.current;
+    if (!el) return;
+
+    updateScrollProgress();
+
+    el.addEventListener("scroll", updateScrollProgress, { passive: true });
+    window.addEventListener("resize", updateScrollProgress);
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => {
+        updateScrollProgress();
+      });
+      ro.observe(el);
+    }
+
+    return () => {
+      el.removeEventListener("scroll", updateScrollProgress);
+      window.removeEventListener("resize", updateScrollProgress);
+      if (ro) ro.disconnect();
+    };
+  }, [updateScrollProgress, visibleStages, filteredLeads.length]);
+
+  const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = kanbanContainerRef.current;
+    const track = trackRef.current;
+    if (!el || !track) return;
+
+    const rect = track.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const trackWidth = rect.width;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    if (maxScroll <= 0 || trackWidth <= 0) return;
+
+    const thumbWidth = (scrollProgress.widthPct / 100) * trackWidth;
+    const availableTrackWidth = trackWidth - thumbWidth;
+    if (availableTrackWidth <= 0) return;
+
+    const targetThumbLeft = clickX - thumbWidth / 2;
+    const clickRatio = Math.max(0, Math.min(1, targetThumbLeft / availableTrackWidth));
+    const targetScrollLeft = clickRatio * maxScroll;
+    el.scrollTo({ left: targetScrollLeft, behavior: "smooth" });
+  };
+
+  const handleThumbPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = kanbanContainerRef.current;
+    const track = trackRef.current;
+    if (!el || !track) return;
+
+    setIsDraggingTrack(true);
+    const startX = e.clientX;
+    const startScrollLeft = el.scrollLeft;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    const trackRect = track.getBoundingClientRect();
+    const trackWidth = trackRect.width;
+    const thumbWidth = (scrollProgress.widthPct / 100) * trackWidth;
+    const availableTrackWidth = trackWidth - thumbWidth;
+
+    if (availableTrackWidth <= 0 || maxScroll <= 0) return;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const deltaScroll = (deltaX / availableTrackWidth) * maxScroll;
+      const newScroll = Math.max(0, Math.min(maxScroll, startScrollLeft + deltaScroll));
+      el.scrollLeft = newScroll;
+
+      const thumbWidthPercent = Math.max(15, Math.min(100, (el.clientWidth / el.scrollWidth) * 100));
+      const thumbLeftPercent = Math.max(
+        0,
+        Math.min(100 - thumbWidthPercent, (newScroll / maxScroll) * (100 - thumbWidthPercent))
+      );
+      setScrollProgress({ widthPct: thumbWidthPercent, leftPct: thumbLeftPercent });
+    };
+
+    const onPointerUp = () => {
+      setIsDraggingTrack(false);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+    };
+
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+  };
+
+  // Synchroniser l'étape mobile sélectionnée si visibleStages change (ex: commercial vs admin)
+  useEffect(() => {
+    if (!visibleStages.some((s) => s.key === selectedMobileStage)) {
+      if (visibleStages.length > 0) {
+        setSelectedMobileStage(visibleStages[0].key);
+      }
+    }
+  }, [visibleStages, selectedMobileStage]);
 
   // Réinitialiser le filtre si le commercial sélectionné ne correspond plus à la marque active
   useEffect(() => {
@@ -113,15 +264,18 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     );
   };
 
-  const filteredLeads = leads.filter((l) => {
-    if (isCommercial && l.stage === "a_qualifier") {
-      return false;
+  const stageCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of visibleStages) {
+      counts[s.key] = 0;
     }
-    if (isAdmin && commercialFilter !== "tous") {
-      return l.commercial === commercialFilter;
+    for (const l of filteredLeads) {
+      if (counts[l.stage] !== undefined) {
+        counts[l.stage]++;
+      }
     }
-    return true;
-  });
+    return counts;
+  }, [visibleStages, filteredLeads]);
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     setDraggedLeadId(id);
@@ -159,9 +313,38 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   };
 
   return (
-    <div className="page active">
+    <div
+      className="page active leads-page h-screen max-h-screen overflow-hidden flex flex-col justify-between bg-[#18181A] px-6 pb-4 pt-3"
+      style={
+        isMobile
+          ? undefined
+          : {
+              height: "100%",
+              maxHeight: "100%",
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              overflow: "hidden",
+              backgroundColor: "#18181A",
+              padding: "14px 24px 14px",
+              boxSizing: "border-box",
+            }
+      }
+    >
       {/* Barre d'outils épurée, compacte et minimaliste */}
-      <div className="toolbar" style={{ marginBottom: "16px" }}>
+      <div
+        className="toolbar shrink-0 mb-3"
+        style={{
+          flexShrink: 0,
+          marginBottom: "12px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "10px",
+        }}
+      >
         <p className="sub" style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.84rem" }}>
           Pipeline de conversion commercial · {filteredLeads.length} lead{filteredLeads.length > 1 ? "s" : ""}
         </p>
@@ -200,16 +383,15 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           {(isAdmin || isCentreAppel) && (
             <button
               type="button"
-              className="btn-ghost"
-              style={{ border: "1px solid var(--border)", borderRadius: "9px" }}
+              className="btn-secondary"
               onClick={onSimulateMeta}
             >
               Simuler un lead Meta Ads
             </button>
           )}
 
-          <button type="button" className="btn" onClick={onCreateLead}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <button type="button" className="btn-create-white" onClick={onCreateLead}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 14, height: 14 }}>
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -218,28 +400,119 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         </div>
       </div>
 
-      <div className="kanban-wrapper">
-        <div ref={kanbanContainerRef} className="kanban">
-          {visibleStages.map((s) => {
-            const colLeads = filteredLeads.filter((l) => l.stage === s.key);
-            const isOver = dragOverStage === s.key;
+      {/* Barre d'onglets horizontaux défilable pour mobile (md:hidden) */}
+      <div className="kanban-mobile-tabs md:hidden" role="tablist" aria-label="Étapes du pipeline">
+        {visibleStages.map((s) => {
+          const count = stageCounts[s.key] || 0;
+          const isActive = selectedMobileStage === s.key;
+          return (
+            <button
+              key={s.key}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              className={`kanban-mobile-tab-btn ${isActive ? "active" : ""}`}
+              onClick={() => setSelectedMobileStage(s.key)}
+            >
+              <span>{s.label}</span>
+              <span className="kanban-mobile-tab-count">({count})</span>
+            </button>
+          );
+        })}
+      </div>
 
-            return (
+      {/* Kanban Columns Area */}
+      <div
+        ref={kanbanContainerRef}
+        className="kanban no-scrollbar flex-1 min-h-0 w-full overflow-x-auto flex gap-4 px-6"
+        style={
+          isMobile
+            ? undefined
+            : {
+                flex: "1 1 0%",
+                minHeight: 0,
+                width: "100%",
+                overflowX: "auto",
+                overflowY: "hidden",
+                display: "flex",
+                gap: "16px",
+                padding: 0,
+                margin: 0,
+                boxSizing: "border-box",
+              }
+        }
+      >
+        {stagesToRender.map((s) => {
+          const colLeads = filteredLeads.filter((l) => l.stage === s.key);
+          const isOver = dragOverStage === s.key;
+          const isMobileActive = selectedMobileStage === s.key;
+
+          return (
+            <div
+              key={s.key}
+              ref={(el) => {
+                columnRefs.current[s.key] = el;
+              }}
+              className={`kcol w-[310px] shrink-0 h-full max-h-full flex flex-col bg-[#09090B] rounded-2xl border border-neutral-800/60 overflow-hidden ${isOver ? "dragover" : ""} ${isMobileActive ? "mobile-active" : ""}`}
+              style={
+                isMobile
+                  ? undefined
+                  : {
+                      width: "310px",
+                      minWidth: "310px",
+                      maxWidth: "310px",
+                      flexShrink: 0,
+                      height: "100%",
+                      maxHeight: "100%",
+                      display: "flex",
+                      flexDirection: "column",
+                      backgroundColor: "#09090B",
+                      borderRadius: "16px",
+                      border: "1px solid rgba(38, 38, 38, 0.6)",
+                      overflow: "hidden",
+                      position: "relative",
+                      boxSizing: "border-box",
+                    }
+              }
+              onDragOver={(e) => handleDragOver(e, s.key)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, s.key)}
+            >
               <div
-                key={s.key}
-                ref={(el) => {
-                  columnRefs.current[s.key] = el;
+                className="kcol-head shrink-0"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "14px 16px",
+                  flexShrink: 0,
+                  borderBottom: "1px solid rgba(38, 38, 38, 0.4)",
+                  boxSizing: "border-box",
                 }}
-                className={`kcol ${isOver ? "dragover" : ""}`}
-                onDragOver={(e) => handleDragOver(e, s.key)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, s.key)}
               >
-                <div className="kcol-head">
-                  <span className="kname">{s.label}</span>
-                  <span className="kcount">{colLeads.length}</span>
-                </div>
+                <span className="kname">{s.label}</span>
+                <span className="kcount">{colLeads.length}</span>
+              </div>
 
+              <div
+                className="kcol-body flex-1 min-h-0 overflow-y-auto space-y-3 p-3"
+                style={
+                  isMobile
+                    ? undefined
+                    : {
+                        flex: "1 1 0%",
+                        minHeight: 0,
+                        height: 0,
+                        overflowY: "auto",
+                        overflowX: "hidden",
+                        padding: "12px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "12px",
+                        boxSizing: "border-box",
+                      }
+                }
+              >
                 {colLeads.length === 0 && (
                   <div
                     style={{
@@ -399,7 +672,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
                       {l.fiche && l.fiche.interet && (
                         <div className="cell-sub" style={{ marginTop: "6px" }}>
-                          📋 {INTERET_NIVEAU[l.fiche.interet]?.label || l.fiche.interet} ·{" "}
+                          {INTERET_NIVEAU[l.fiche.interet]?.label || l.fiche.interet} ·{" "}
                           {l.fiche.budget || ""}
                         </div>
                       )}
@@ -436,73 +709,128 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       {isAdmin && (
                         <div
                           className="row-actions"
-                          style={{ marginTop: "9px", justifyContent: "flex-start" }}
+                          style={{ marginTop: "9px", justifyContent: "flex-start", gap: "6px" }}
                         >
                           <button
                             type="button"
-                            className="icon-btn"
+                            className="action-btn-pill"
                             title="Modifier"
                             onClick={(e) => {
                               e.stopPropagation();
                               onEditLead(l.id);
                             }}
+                            aria-label={`Modifier le lead ${l.client}`}
                           >
-                            ✎
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}>
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
                           </button>
                           <button
                             type="button"
-                            className="icon-btn danger"
+                            className="action-btn-pill danger"
                             title="Supprimer"
                             onClick={(e) => {
                               e.stopPropagation();
                               onDeleteLead(l.id);
                             }}
+                            aria-label={`Supprimer le lead ${l.client}`}
                           >
-                            🗑
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}>
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            </svg>
                           </button>
                         </div>
                       )}
 
-                      {lastMsg ? (
-                        <div
-                          className="kwa"
-                          title="Ouvrir la conversation WhatsApp"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenWa(l.id);
-                          }}
-                        >
-                          <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2C6.5 2 2 6.3 2 11.6c0 1.8.5 3.5 1.4 5L2 22l5.6-1.4c1.5.8 3.1 1.2 4.4 1.2 5.5 0 10-4.3 10-9.7S17.5 2 12 2Z" />
-                          </svg>
-                          <span className="kwa-text">
-                            {(lastMsg.from === "moi" ? "Vous : " : "") + lastMsg.text}
-                          </span>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className="kcard-wa-start-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenWa(l.id);
-                          }}
-                          title="Lancer une conversation WhatsApp avec ce lead"
-                        >
-                          <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2C6.5 2 2 6.3 2 11.6c0 1.8.5 3.5 1.4 5L2 22l5.6-1.4c1.5.8 3.1 1.2 4.4 1.2 5.5 0 10-4.3 10-9.7S17.5 2 12 2Z" />
-                          </svg>
-                          <span>Chat WhatsApp</span>
-                        </button>
-                      )}
+                      <div
+                        className="kwa"
+                        title="Ouvrir la conversation WhatsApp"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenWa(l.id);
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 2C6.5 2 2 6.3 2 11.6c0 1.8.5 3.5 1.4 5L2 22l5.6-1.4c1.5.8 3.1 1.2 4.4 1.2 5.5 0 10-4.3 10-9.7S17.5 2 12 2Z" />
+                        </svg>
+                        <span className="kwa-text">
+                          {lastMsg
+                            ? (lastMsg.from === "moi" ? "Vous : " : "") + lastMsg.text
+                            : "Lead généré automatiquement..."}
+                        </span>
+                      </div>
                     </div>
                   );
                 })}
               </div>
-            );
-          })}
-        </div>
+
+              {/* Gradient fade mask for smooth bottom card clipping affordance */}
+              <div className="kcol-fade-mask" aria-hidden="true" />
+            </div>
+          );
+        })}
       </div>
+
+      {/* Dedicated visible Linear-style horizontal bottom slider track */}
+      {!isMobile && (
+        <div
+          className="shrink-0 w-full flex justify-center items-center py-3 bg-[#18181A] kanban-footer-slider-wrap hidden md:flex"
+          style={{
+            flexShrink: 0,
+            width: "100%",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            paddingTop: "10px",
+            paddingBottom: "2px",
+            backgroundColor: "#18181A",
+          }}
+        >
+          <div
+            ref={trackRef}
+            className="w-[50%] max-w-md h-1.5 bg-neutral-800 rounded-full relative cursor-pointer overflow-hidden kanban-slider-track"
+            style={{
+              width: "50%",
+              maxWidth: "448px",
+              height: "6px",
+              backgroundColor: "#262626",
+              borderRadius: "9999px",
+              position: "relative",
+              cursor: "pointer",
+              overflow: "hidden",
+              boxSizing: "border-box",
+            }}
+            onClick={handleTrackClick}
+            role="scrollbar"
+            aria-label="Contrôleur de défilement horizontal du pipeline"
+            aria-controls="kanban-board"
+            aria-valuenow={Math.round(scrollProgress.leftPct)}
+          >
+            <div
+              className={`h-full bg-neutral-300 hover:bg-white rounded-full transition-none kanban-slider-thumb ${isDraggingTrack ? "dragging" : ""}`}
+              style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                height: "100%",
+                backgroundColor: isDraggingTrack ? "#FFFFFF" : "#D4D4D4",
+                borderRadius: "9999px",
+                width: `${scrollProgress.widthPct}%`,
+                left: `${scrollProgress.leftPct}%`,
+                cursor: isDraggingTrack ? "grabbing" : "grab",
+                transition: "none",
+                touchAction: "none",
+                userSelect: "none",
+                WebkitUserSelect: "none",
+                willChange: "left, width",
+              }}
+              onPointerDown={handleThumbPointerDown}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
